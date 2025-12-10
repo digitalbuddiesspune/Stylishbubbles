@@ -85,13 +85,22 @@ export const createPayUTxn = async (req, res) => {
     const hash = crypto.createHash('sha512').update(hashString).digest('hex');
 
     // Backend callback URLs (PayU sends POST here first, then redirects user via GET)
-    const BACKEND_URL = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 7000}`;
+    // For production, BACKEND_URL should be set to your live backend URL (e.g., https://your-backend.onrender.com)
+    const BACKEND_URL = process.env.BACKEND_URL || (process.env.NODE_ENV === 'production' 
+      ? `https://your-backend-domain.com` 
+      : `http://localhost:${process.env.PORT || 5000}`);
+    
     const callbackSuccessUrl = process.env.PAYU_CALLBACK_SUCCESS_URL || `${BACKEND_URL}/api/payment/payu/callback?status=success`;
     const callbackFailUrl = process.env.PAYU_CALLBACK_FAIL_URL || `${BACKEND_URL}/api/payment/payu/callback?status=fail`;
 
     // Frontend redirect URLs (where user is redirected after backend processes POST)
-    const frontendSuccessUrl = process.env.PAYU_SUCCESS_URL || `${process.env.FRONTEND_URL || 'http://localhost:5174'}/payment-success`;
-    const frontendFailUrl = process.env.PAYU_FAIL_URL || `${process.env.FRONTEND_URL || 'http://localhost:5174'}/payment-fail`;
+    // For production, FRONTEND_URL should be set to your live frontend URL (e.g., https://your-frontend.vercel.app)
+    const FRONTEND_URL = process.env.FRONTEND_URL || (process.env.NODE_ENV === 'production'
+      ? 'https://your-frontend-domain.com'
+      : 'http://localhost:5174');
+    
+    const frontendSuccessUrl = process.env.PAYU_SUCCESS_URL || `${FRONTEND_URL}/payment-success`;
+    const frontendFailUrl = process.env.PAYU_FAIL_URL || `${FRONTEND_URL}/payment-fail`;
 
     // Store txnid -> userId mapping if userId is available (from optional auth)
     // This helps us find the user during callback when PayU sends POST
@@ -150,8 +159,13 @@ export const verifyPayUPayment = async (req, res) => {
     } = dataSource;
 
     // Frontend redirect URLs
-    const frontendSuccessUrl = process.env.PAYU_SUCCESS_URL || `${process.env.FRONTEND_URL || 'http://localhost:5174'}/payment-success`;
-    const frontendFailUrl = process.env.PAYU_FAIL_URL || `${process.env.FRONTEND_URL || 'http://localhost:5174'}/payment-fail`;
+    // For production, FRONTEND_URL should be set to your live frontend URL
+    const FRONTEND_URL = process.env.FRONTEND_URL || (process.env.NODE_ENV === 'production'
+      ? 'https://your-frontend-domain.com'
+      : 'http://localhost:5174');
+    
+    const frontendSuccessUrl = process.env.PAYU_SUCCESS_URL || `${FRONTEND_URL}/payment-success`;
+    const frontendFailUrl = process.env.PAYU_FAIL_URL || `${FRONTEND_URL}/payment-fail`;
 
     // If GET request without required data, redirect to fail page
     if (!isPost && (!txnid || !status)) {
@@ -269,7 +283,10 @@ export const verifyPayUPayment = async (req, res) => {
     return res.redirect(redirectUrl);
   } catch (err) {
     console.error('PayU verifyPayment error:', err?.message || err);
-    const frontendFailUrl = process.env.PAYU_FAIL_URL || `${process.env.FRONTEND_URL || 'http://localhost:5174'}/payment-fail`;
+    const FRONTEND_URL = process.env.FRONTEND_URL || (process.env.NODE_ENV === 'production'
+      ? 'https://your-frontend-domain.com'
+      : 'http://localhost:5174');
+    const frontendFailUrl = process.env.PAYU_FAIL_URL || `${FRONTEND_URL}/payment-fail`;
     return res.redirect(`${frontendFailUrl}?error=Verification failed`);
   }
 };

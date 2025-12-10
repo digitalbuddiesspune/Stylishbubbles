@@ -135,7 +135,11 @@ export default function AddressForm() {
       // Create a form and auto-submit to PayU
       const form = document.createElement('form');
       form.method = 'POST';
-      form.action = 'https://test.payu.in/_payment'; // PayU test URL
+      // Use live PayU URL for production, test URL for development
+      const isProduction = import.meta.env.PROD || import.meta.env.VITE_PAYU_MODE === 'live';
+      form.action = isProduction 
+        ? 'https://secure.payu.in/_payment' // PayU live URL
+        : 'https://test.payu.in/_payment';  // PayU test URL
       form.id = 'payuForm';
 
       // Add ALL required PayU fields in EXACT order and naming
