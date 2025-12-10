@@ -1,12 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../utils/api';
 
 const SignIn = () => {
+  const [authMode, setAuthMode] = useState('password'); // 'password' or 'otp'
   const [formData, setFormData] = useState({
     email: '',
     password: '',
+    phone: '',
+    otp: '',
   });
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpTimer, setOtpTimer] = useState(0);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -18,6 +23,41 @@ const SignIn = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // OTP Timer
+  useEffect(() => {
+    let interval = null;
+    if (otpTimer > 0) {
+      interval = setInterval(() => {
+        setOtpTimer((prev) => prev - 1);
+      }, 1000);
+    } else if (otpTimer === 0 && interval) {
+      clearInterval(interval);
+    }
+    return () => clearInterval(interval);
+  }, [otpTimer]);
+
+  const handleSendOTP = async () => {
+    if (!formData.phone) {
+      setError('Please enter your phone number');
+      return;
+    }
+    
+    setError('');
+    setSuccess('');
+    setLoading(true);
+
+    try {
+      await api.sendOTP({ phone: formData.phone, purpose: 'signin' });
+      setSuccess('OTP sent to your phone number');
+      setOtpSent(true);
+      setOtpTimer(60); // 60 seconds cooldown
+    } catch (err) {
+      setError(err.message || 'Failed to send OTP');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -25,7 +65,19 @@ const SignIn = () => {
     setLoading(true);
 
     try {
-      const resp = await api.signin({ email: formData.email, password: formData.password });
+      let resp;
+      
+      if (authMode === 'otp') {
+        if (!otpSent) {
+          await handleSendOTP();
+          setLoading(false);
+          return;
+        }
+        resp = await api.verifyOTPSignin({ phone: formData.phone, otp: formData.otp });
+      } else {
+        resp = await api.signin({ email: formData.email, password: formData.password });
+      }
+      
       // store token then redirect to intended page or home
       if (resp?.token) localStorage.setItem('auth_token', resp.token);
       if (resp?.user?.isAdmin) {
@@ -85,62 +137,173 @@ const SignIn = () => {
             <div className="bg-white rounded-2xl shadow-lg p-6 border border-neutral-100">
               {error && (<div className="mb-4 text-sm text-red-600">{error}</div>)}
               {success && (<div className="mb-4 text-sm text-green-600">{success}</div>)}
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-neutral-700 mb-2">
-                    Email Address
-                  </label>
-                  <input
-                    type="email"
-                    id="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-400 focus:border-transparent transition-all"
-                    placeholder="Enter your email"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="password" className="block text-sm font-medium text-neutral-700 mb-2">
-                    Password
-                  </label>
-                  <input
-                    type="password"
-                    id="password"
-                    name="password"
-                    value={formData.password}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-400 focus:border-transparent transition-all"
-                    placeholder="Enter your password"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 text-rose-500 focus:ring-rose-400 border-neutral-300 rounded"
-                    />
-                    <span className="ml-2 text-sm text-gray-600">Remember me</span>
-                  </label>
-                  <Link
-                    to="/forgot-password"
-                    className="text-sm text-rose-500 hover:text-rose-600 transition-colors"
-                  >
-                    Forgot password?
-                  </Link>
-                </div>
-
+              
+              {/* Auth Mode Toggle */}
+              <div className="mb-4 flex gap-2 p-1 bg-gray-100 rounded-lg">
                 <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full bg-gradient-to-r from-rose-500 to-rose-600 text-white py-2 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5 disabled:opacity-60"
+                  type="button"
+                  onClick={() => {
+                    setAuthMode('password');
+                    setOtpSent(false);
+                    setError('');
+                    setSuccess('');
+                  }}
+                  className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
+                    authMode === 'password'
+                      ? 'bg-white text-rose-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
                 >
-                  {loading ? 'Signing In...' : 'Sign In'}
+                  Password
                 </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode('otp');
+                    setOtpSent(false);
+                    setError('');
+                    setSuccess('');
+                  }}
+                  className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
+                    authMode === 'otp'
+                      ? 'bg-white text-rose-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  OTP Login
+                </button>
+              </div>
+
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {authMode === 'password' ? (
+                  <>
+                    <div>
+                      <label htmlFor="email" className="block text-sm font-medium text-neutral-700 mb-2">
+                        Email Address
+                      </label>
+                      <input
+                        type="email"
+                        id="email"
+                        name="email"
+                        value={formData.email}
+                        onChange={handleChange}
+                        required
+                        className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-400 focus:border-transparent transition-all"
+                        placeholder="Enter your email"
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="password" className="block text-sm font-medium text-neutral-700 mb-2">
+                        Password
+                      </label>
+                      <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        value={formData.password}
+                        onChange={handleChange}
+                        required
+                        className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-400 focus:border-transparent transition-all"
+                        placeholder="Enter your password"
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <label htmlFor="phone" className="block text-sm font-medium text-neutral-700 mb-2">
+                        Phone Number
+                      </label>
+                      <input
+                        type="tel"
+                        id="phone"
+                        name="phone"
+                        value={formData.phone}
+                        onChange={handleChange}
+                        required
+                        disabled={otpSent}
+                        className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-400 focus:border-transparent transition-all disabled:bg-gray-100"
+                        placeholder="Enter your 10-digit phone number"
+                        maxLength={10}
+                      />
+                    </div>
+
+                    {otpSent && (
+                      <div>
+                        <label htmlFor="otp" className="block text-sm font-medium text-neutral-700 mb-2">
+                          Enter OTP
+                        </label>
+                        <input
+                          type="text"
+                          id="otp"
+                          name="otp"
+                          value={formData.otp}
+                          onChange={handleChange}
+                          required
+                          className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-400 focus:border-transparent transition-all"
+                          placeholder="Enter 6-digit OTP"
+                          maxLength={6}
+                        />
+                        {otpTimer > 0 && (
+                          <p className="mt-1 text-xs text-gray-500">
+                            Resend OTP in {otpTimer} seconds
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {authMode === 'password' && (
+                  <div className="flex items-center justify-between">
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 text-rose-500 focus:ring-rose-400 border-neutral-300 rounded"
+                      />
+                      <span className="ml-2 text-sm text-gray-600">Remember me</span>
+                    </label>
+                    <Link
+                      to="/forgot-password"
+                      className="text-sm text-rose-500 hover:text-rose-600 transition-colors"
+                    >
+                      Forgot password?
+                    </Link>
+                  </div>
+                )}
+
+                {authMode === 'otp' && !otpSent && (
+                  <button
+                    type="button"
+                    onClick={handleSendOTP}
+                    disabled={loading || !formData.phone}
+                    className="w-full bg-gradient-to-r from-rose-500 to-rose-600 text-white py-2 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5 disabled:opacity-60"
+                  >
+                    {loading ? 'Sending OTP...' : 'Send OTP'}
+                  </button>
+                )}
+
+                {(authMode === 'password' || (authMode === 'otp' && otpSent)) && (
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full bg-gradient-to-r from-rose-500 to-rose-600 text-white py-2 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5 disabled:opacity-60"
+                  >
+                    {loading ? 'Signing In...' : 'Sign In'}
+                  </button>
+                )}
+
+                {authMode === 'otp' && otpSent && otpTimer === 0 && (
+                  <button
+                    type="button"
+                    onClick={handleSendOTP}
+                    disabled={loading}
+                    className="w-full mt-2 border border-rose-500 text-rose-600 py-2 rounded-lg font-semibold hover:bg-rose-50 transition-all duration-300"
+                  >
+                    Resend OTP
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => navigate(location.state?.from?.pathname || '/')}
