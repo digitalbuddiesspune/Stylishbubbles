@@ -21,6 +21,10 @@ export const api = {
   signin: (payload) => request('/auth/signin', { method: 'POST', body: JSON.stringify(payload) }),
   signup: (payload) => request('/auth/signup', { method: 'POST', body: JSON.stringify(payload) }),
   forgotPassword: (payload) => request('/auth/forgot-password', { method: 'POST', body: JSON.stringify(payload) }),
+  // OTP Authentication
+  sendOTP: (payload) => request('/auth/otp/send', { method: 'POST', body: JSON.stringify(payload) }),
+  verifyOTPSignup: (payload) => request('/auth/otp/verify/signup', { method: 'POST', body: JSON.stringify(payload) }),
+  verifyOTPSignin: (payload) => request('/auth/otp/verify/signin', { method: 'POST', body: JSON.stringify(payload) }),
   me: async () => {
     try {
       return await request('/me', { method: 'GET' });

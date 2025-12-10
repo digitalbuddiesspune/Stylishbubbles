@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../utils/api';
 
@@ -10,8 +10,12 @@ const SignUp = () => {
     phone: '',
     password: '',
     confirmPassword: '',
+    otp: '',
     agreeToTerms: false,
   });
+
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpTimer, setOtpTimer] = useState(0);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -26,23 +30,111 @@ const SignUp = () => {
   const [success, setSuccess] = useState('');
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setSuccess('');
+  // OTP Timer
+  useEffect(() => {
+    let interval = null;
+    if (otpTimer > 0) {
+      interval = setInterval(() => {
+        setOtpTimer((prev) => prev - 1);
+      }, 1000);
+    } else if (otpTimer === 0 && interval) {
+      clearInterval(interval);
+    }
+    return () => clearInterval(interval);
+  }, [otpTimer]);
+
+  const handleSendOTP = async () => {
+    // Validate form fields before sending OTP
+    if (!formData.firstName || !formData.lastName || !formData.email || !formData.phone) {
+      setError('Please fill in all required fields');
+      return;
+    }
+    
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
       return;
     }
+
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+
+    if (!formData.agreeToTerms) {
+      setError('Please agree to the terms and conditions');
+      return;
+    }
+
+    setError('');
+    setSuccess('');
     setLoading(true);
+
     try {
       const name = `${formData.firstName} ${formData.lastName}`.trim();
-      const resp = await api.signup({ name, email: formData.email, password: formData.password });
-      setSuccess('Account created successfully');
-      // Do NOT auto-login after signup; redirect to Sign In
-      navigate('/signin', { replace: true });
+      // Hash password on backend, but send it temporarily for OTP storage
+      const passwordHash = formData.password; // Will be hashed on backend
+      
+      await api.sendOTP({
+        phone: formData.phone,
+        purpose: 'signup',
+        userData: {
+          name,
+          email: formData.email,
+          passwordHash, // Backend will hash this before storing
+        },
+      });
+      
+      setSuccess('OTP sent to your phone number');
+      setOtpSent(true);
+      setOtpTimer(60); // 60 seconds cooldown
     } catch (err) {
-      setError(err.message || 'Failed to sign up');
+      setError(err.message || 'Failed to send OTP');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+
+    if (!otpSent) {
+      // If OTP not sent, send it first
+      await handleSendOTP();
+      return;
+    }
+
+    if (!formData.otp) {
+      setError('Please enter the OTP');
+      return;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const resp = await api.verifyOTPSignup({
+        phone: formData.phone,
+        otp: formData.otp,
+      });
+      
+      setSuccess('Account created successfully');
+      // Auto-login after successful OTP verification
+      if (resp?.token) {
+        localStorage.setItem('auth_token', resp.token);
+        if (resp?.user?.isAdmin) {
+          localStorage.setItem('auth_is_admin', 'true');
+        }
+        navigate('/', { replace: true });
+      } else {
+        navigate('/signin', { replace: true });
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to create account');
     } finally {
       setLoading(false);
     }
@@ -152,10 +244,39 @@ const SignUp = () => {
                     value={formData.phone}
                     onChange={handleChange}
                     required
-                    className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-400 focus:border-transparent transition-all text-sm"
-                    placeholder="Enter your phone number"
+                    disabled={otpSent}
+                    className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-400 focus:border-transparent transition-all text-sm disabled:bg-gray-100"
+                    placeholder="Enter your 10-digit phone number"
+                    maxLength={10}
                   />
+                  {otpSent && (
+                    <p className="mt-1 text-xs text-green-600">✓ OTP sent to this number</p>
+                  )}
                 </div>
+
+                {otpSent && (
+                  <div>
+                    <label htmlFor="otp" className="block text-sm font-medium text-neutral-700 mb-1">
+                      Enter OTP
+                    </label>
+                    <input
+                      type="text"
+                      id="otp"
+                      name="otp"
+                      value={formData.otp}
+                      onChange={handleChange}
+                      required
+                      className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-400 focus:border-transparent transition-all text-sm"
+                      placeholder="Enter 6-digit OTP"
+                      maxLength={6}
+                    />
+                    {otpTimer > 0 && (
+                      <p className="mt-1 text-xs text-gray-500">
+                        Resend OTP in {otpTimer} seconds
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -212,13 +333,36 @@ const SignUp = () => {
                   </label>
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full bg-gradient-to-r from-rose-500 to-rose-600 text-white py-2.5 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 text-sm disabled:opacity-60"
-                >
-                  {loading ? 'Creating...' : 'Create Account'}
-                </button>
+                {!otpSent ? (
+                  <button
+                    type="button"
+                    onClick={handleSendOTP}
+                    disabled={loading}
+                    className="w-full bg-gradient-to-r from-rose-500 to-rose-600 text-white py-2.5 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 text-sm disabled:opacity-60"
+                  >
+                    {loading ? 'Sending OTP...' : 'Send OTP'}
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="w-full bg-gradient-to-r from-rose-500 to-rose-600 text-white py-2.5 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 text-sm disabled:opacity-60"
+                    >
+                      {loading ? 'Creating Account...' : 'Create Account'}
+                    </button>
+                    {otpTimer === 0 && (
+                      <button
+                        type="button"
+                        onClick={handleSendOTP}
+                        disabled={loading}
+                        className="w-full mt-2 border border-rose-500 text-rose-600 py-2 rounded-lg font-semibold hover:bg-rose-50 transition-all duration-300 text-sm"
+                      >
+                        Resend OTP
+                      </button>
+                    )}
+                  </>
+                )}
               </form>
 
               {/* Divider */}
