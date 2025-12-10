@@ -2,11 +2,13 @@ import mongoose from "mongoose";
 
 const productSchema = new mongoose.Schema(
   {
-    title: { type: String, required: true },                  // Product title
+    title: { type: String, required: true, index: true },                  // Product title
     mrp: { type: Number, required: true },                    // MRP (maximum retail price)
     discountPercent: { type: Number, default: 0, min: 0, max: 100 }, // Discount in %
     description: { type: String },
     category: { type: String, required: true, index: true },
+    subcategory: { type: String, index: true },
+    tags: { type: [String], index: true },
     categoryId: { 
       type: mongoose.Schema.Types.ObjectId, 
       ref: 'Category',
@@ -31,6 +33,10 @@ const productSchema = new mongoose.Schema(
   },
   { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }
 );
+
+// Compound index for faster category queries
+productSchema.index({ category: 1, createdAt: -1 });
+productSchema.index({ subcategory: 1, createdAt: -1 });
 
 // 💡 Virtual field: Automatically calculate final price after discount
 productSchema.virtual("price").get(function () {

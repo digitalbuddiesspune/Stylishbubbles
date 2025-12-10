@@ -18,8 +18,6 @@ export const getProducts = async (req, res) => {
     const category = rawCategory.replace(/-/g, ' ').trim();
     let query = {};
 
-    console.log('Received request with query params:', req.query);
-
     if (category) {
       // Try multiple ways to match the category or subcategory fields
       const re = new RegExp(category, 'i');
@@ -38,50 +36,20 @@ export const getProducts = async (req, res) => {
       }
 
       query = { $or: orConditions };
-
-      console.log('Search query:', JSON.stringify(query, null, 2));
     }
 
-    // Get all products (for debugging)
-    const allProducts = await Product.find({});
-    console.log(`Total products in database: ${allProducts.length}`);
-    
-    if (allProducts.length > 0) {
-      console.log('Sample product:', {
-        _id: allProducts[0]._id,
-        title: allProducts[0].title,
-        category: allProducts[0].category,
-        price: allProducts[0].price
-      });
-      
-      // Log all unique categories in the database
-      const categories = [...new Set(allProducts.map(p => 
-        p.category ? (typeof p.category === 'string' ? p.category : p.category.name) : 'None'
-      ))];
-      console.log('All categories in database:', categories);
-    }
+    // Execute the query with lean() for faster performance (returns plain JS objects)
+    let products = await Product.find(query).lean();
 
-    // Execute the query
-    let products = await Product.find(query);
-    console.log(`Found ${products.length} matching products`);
-
-    // Process image URLs to ensure they're absolute
+    // Process image URLs to ensure they're absolute (only if needed)
     products = products.map(product => {
-      const productObj = product.toObject();
-      if (productObj.images && Array.isArray(productObj.images)) {
-        productObj.images = productObj.images.map(img => {
-          if (img && img.url && !img.url.startsWith('http')) {
-            // If the URL is relative, make it absolute
-            const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 7000}`;
-            return {
-              ...img,
-              url: img.url.startsWith('/') ? `${baseUrl}${img.url}` : `${baseUrl}/${img.url}`
-            };
-          }
-          return img;
-        });
+      // Calculate price if not already present
+      if (!product.price && product.mrp && product.discountPercent) {
+        product.price = Math.round(product.mrp - (product.mrp * product.discountPercent / 100));
       }
-      return productObj;
+      
+      // Images are already in the correct format (image1, image2, image3), no need to process
+      return product;
     });
     
     res.json(products);
@@ -97,30 +65,18 @@ export const getProducts = async (req, res) => {
 
 export const getProductById = async (req, res) => {
   try {
-    let product = await Product.findById(req.params.id);
+    // Use lean() for faster performance
+    let product = await Product.findById(req.params.id).lean();
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
     }
 
-    // Convert to plain object to modify
-    const productObj = product.toObject();
-    
-    // Process image URLs to ensure they're absolute
-    if (productObj.images && Array.isArray(productObj.images)) {
-      productObj.images = productObj.images.map(img => {
-        if (img && img.url && !img.url.startsWith('http')) {
-          // If the URL is relative, make it absolute
-          const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 6000}`;
-          return {
-            ...img,
-            url: img.url.startsWith('/') ? `${baseUrl}${img.url}` : `${baseUrl}/${img.url}`
-          };
-        }
-        return img;
-      });
+    // Calculate price if not already present
+    if (!product.price && product.mrp && product.discountPercent) {
+      product.price = Math.round(product.mrp - (product.mrp * product.discountPercent / 100));
     }
     
-    res.json(productObj);
+    res.json(product);
   } catch (error) {
     console.error('Error fetching product:', error);
     res.status(500).json({ 

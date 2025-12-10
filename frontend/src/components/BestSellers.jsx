@@ -25,8 +25,9 @@ const BestSellers = () => {
         const regularProducts = data
           .filter(p => p.images?.image1 && !productsWithDiscount.find(prod => prod._id === p._id));
         
-        // Combine: discount products first, then regular products
-        setProducts([...productsWithDiscount, ...regularProducts]);
+        // Combine: discount products first, then regular products, limit to first 100
+        const allProducts = [...productsWithDiscount, ...regularProducts];
+        setProducts(allProducts.slice(0, 100));
       } catch (error) {
         console.error('Error loading best sellers:', error);
       }

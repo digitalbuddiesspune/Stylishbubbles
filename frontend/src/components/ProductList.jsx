@@ -90,6 +90,16 @@ const ProductList = ({ defaultCategory } = {}) => {
     { id: 10, label: 'Above ₹10,000', min: 10001, max: Infinity },
   ];
   
+  const normalize = (s) => {
+    if (!s) return '';
+    const t = s.replace(/-/g, ' ').toLowerCase();
+    return t.replace(/\b\w/g, (c) => c.toUpperCase());
+  };
+
+  const effectiveCategory = subCategoryName
+    ? normalize(subCategoryName)
+    : (categoryName || defaultCategory) ? normalize(categoryName || defaultCategory) : '';
+
   // Fetch products
   useEffect(() => {
     const load = async () => {
@@ -108,17 +118,7 @@ const ProductList = ({ defaultCategory } = {}) => {
     };
 
     load();
-  }, [categoryName, subCategoryName, defaultCategory]);
-
-  const normalize = (s) => {
-    if (!s) return '';
-    const t = s.replace(/-/g, ' ').toLowerCase();
-    return t.replace(/\b\w/g, (c) => c.toUpperCase());
-  };
-
-  const effectiveCategory = subCategoryName
-    ? normalize(subCategoryName)
-    : (categoryName || defaultCategory) ? normalize(categoryName || defaultCategory) : '';
+  }, [effectiveCategory]);
   
   // Apply filters
   useEffect(() => {

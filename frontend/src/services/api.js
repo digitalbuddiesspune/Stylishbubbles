@@ -1,12 +1,45 @@
 const API_URL = `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:7000'}/api`;
 
+// Simple cache for API responses (30 seconds TTL)
+const cache = new Map();
+const CACHE_TTL = 30 * 1000; // 30 seconds
+
+const getCacheKey = (url) => url;
+
+const getCachedData = (key) => {
+  const cached = cache.get(key);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data;
+  }
+  cache.delete(key);
+  return null;
+};
+
+const setCachedData = (key, data) => {
+  cache.set(key, { data, timestamp: Date.now() });
+};
+
 export const fetchSarees = async (category) => {
   try {
-    const response = await fetch(`${API_URL}/products${category ? `?category=${encodeURIComponent(category)}` : ''}`);
+    const url = `${API_URL}/products${category ? `?category=${encodeURIComponent(category)}` : ''}`;
+    const cacheKey = getCacheKey(url);
+    
+    // Check cache first
+    const cachedData = getCachedData(cacheKey);
+    if (cachedData) {
+      return cachedData;
+    }
+    
+    const response = await fetch(url);
     if (!response.ok) {
       throw new Error('Failed to fetch sarees');
     }
-    return await response.json();
+    const data = await response.json();
+    
+    // Cache the response
+    setCachedData(cacheKey, data);
+    
+    return data;
   } catch (error) {
     console.error('Error fetching sarees:', error);
     throw error;
