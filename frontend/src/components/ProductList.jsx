@@ -299,15 +299,21 @@ const ProductList = ({ defaultCategory } = {}) => {
     );
   }
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <style>{styles}</style>
+        <div className="text-center">
+          <FaSpinner className="animate-spin text-5xl text-pink-600 mx-auto mb-4" />
+          <p className="text-gray-600 text-lg">Loading products...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <style>{styles}</style>
-      {loading && (
-        <div className="fixed left-0 right-0 top-0 z-50">
-          <div className="h-0.5 bg-gradient-to-r from-indigo-500 via-pink-500 to-amber-500 animate-pulse"></div>
-        </div>
-      )}
-
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Header */}
         <div className="mb-6 sticky top-0 bg-gray-50 pt-6 pb-2 z-10">

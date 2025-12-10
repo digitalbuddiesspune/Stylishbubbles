@@ -142,7 +142,10 @@ const TrendingNow = () => {
             </p>
           </div>
           <div className="flex justify-center items-center py-20">
-            <FaSpinner className="animate-spin text-4xl text-pink-600" />
+            <div className="text-center">
+              <FaSpinner className="animate-spin text-5xl text-pink-600 mx-auto mb-4" />
+              <p className="text-gray-600 text-lg">Loading products...</p>
+            </div>
           </div>
         </div>
       </section>

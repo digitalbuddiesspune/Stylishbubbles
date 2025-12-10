@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaRupeeSign, FaHeart, FaRegHeart, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import { FaRupeeSign, FaHeart, FaRegHeart, FaChevronLeft, FaChevronRight, FaSpinner } from 'react-icons/fa';
 import { fetchSarees } from '../services/api';
 
 const BestSellers = () => {
   const [products, setProducts] = useState([]);
   const [wishlist, setWishlist] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -17,6 +18,7 @@ const BestSellers = () => {
   useEffect(() => {
     const loadProducts = async () => {
       try {
+        setLoading(true);
         const data = await fetchSarees('');
         // Filter products with discounts first, then regular products
         const productsWithDiscount = data
@@ -30,6 +32,8 @@ const BestSellers = () => {
         setProducts(allProducts.slice(0, 100));
       } catch (error) {
         console.error('Error loading best sellers:', error);
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -215,6 +219,29 @@ const BestSellers = () => {
     setIsPaused(true);
     setTimeout(() => setIsPaused(false), 3000);
   };
+
+  if (loading) {
+    return (
+      <section className="py-16 px-4 bg-gray-50">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-5xl md:text-6xl font-serif text-gray-800 mb-3 tracking-wide" style={{ fontFamily: 'serif' }}>
+              Best-sellers
+            </h2>
+            <p className="text-base md:text-lg text-gray-600 font-light">
+              Styled for All!
+            </p>
+          </div>
+          <div className="flex justify-center items-center py-20">
+            <div className="text-center">
+              <FaSpinner className="animate-spin text-5xl text-pink-600 mx-auto mb-4" />
+              <p className="text-gray-600 text-lg">Loading products...</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   if (products.length === 0) {
     return null;
