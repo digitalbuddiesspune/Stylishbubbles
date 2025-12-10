@@ -78,7 +78,7 @@ const ProductList = ({ defaultCategory } = {}) => {
   }, [products]);
   
   const priceRanges = [
-    { id: 1, label: '₹300 - ₹1,000', min: 300, max: 1000 },
+    { id: 1, label: '₹100 - ₹1,000', min: 100, max: 1000 },
     { id: 2, label: '₹1,001 - ₹2,000', min: 1001, max: 2000 },
     { id: 3, label: '₹2,001 - ₹3,000', min: 2001, max: 3000 },
     { id: 4, label: '₹3,001 - ₹4,000', min: 3001, max: 4000 },
@@ -395,9 +395,9 @@ const ProductList = ({ defaultCategory } = {}) => {
 
             {/* Results Bar */}
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6 bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-              <p className="text-sm text-gray-600">
+              {/* <p className="text-sm text-gray-600">
                 Showing <span className="font-semibold text-gray-900">{filteredProducts.length}</span> products
-              </p>
+              </p> */}
               <div className="flex items-center gap-2">
                 <label htmlFor="sort" className="text-sm text-gray-600 whitespace-nowrap">Sort by:</label>
                 <select 
