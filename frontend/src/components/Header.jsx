@@ -41,26 +41,13 @@ const Header = () => {
       name: 'WOMEN',
       path: '/category/Women',
       subcategories: [
-        { name: 'Women New Arrivals', path: '/category/Women/women-new-arrivals' },
         { name: 'Kurtis', path: '/category/Women/kurtis' },
         { name: 'Women Kurti Sets', path: '/category/Women/women-kurti-sets' },
         { name: 'Women Comfort Wear', path: '/category/Women/women-comfort-wear' }
         
       ]
     },
-    { 
-      name: 'BOYS', 
-      path: '/category/Boys',
-      subcategories: [
-        
-        { name: 'Boys Kurta Sets', path: '/category/Boys/boys-kurta-sets' },
-        { name: 'Boys Nehru Jackets', path: '/category/Boys/boys-nehru-jackets' },
-        { name: 'Sherwani Set', path: '/category/Boys/sherwani-set' },
-        { name: 'Ethnic Shirt', path: '/category/Boys/ethnic-shirt' },
-        { name: 'Jodhpuri Set', path: '/category/Boys/jodhpuri-set' },
-       
-      ]
-    },
+    
     { 
       name: 'GIRLS', 
       path: '/category/Girls',
