@@ -21,7 +21,7 @@ const Home = () => {
             alt: 'Festive Offers - STYLISHBUBBLES',
           },
         ]}
-        mobileSrc="https://res.cloudinary.com/duc9svg7w/image/upload/v1763383307/file_0000000032ac7209890b93ba8217ac10_1_nfz2u2.png"
+        mobileSrc="https://res.cloudinary.com/duc9svg7w/image/upload/v1765362822/Untitled_1080_x_1080_px_jflc8o.svg"
       />
 
       {/* Shop by Category */}
