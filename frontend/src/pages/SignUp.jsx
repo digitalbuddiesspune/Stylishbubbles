@@ -366,7 +366,7 @@ const SignUp = () => {
               </form>
 
               {/* Divider */}
-              <div className="mt-6 mb-4">
+              {/* <div className="mt-6 mb-4">
                 <div className="relative">
                   <div className="absolute inset-0 flex items-center">
                     <div className="w-full border-t border-neutral-200"></div>
@@ -375,10 +375,10 @@ const SignUp = () => {
                     <span className="px-3 bg-white text-gray-500">Or continue with</span>
                   </div>
                 </div>
-              </div>
+              </div> */}
 
               {/* Social Login */}
-              <div className="flex justify-center">
+              {/* <div className="flex justify-center">
                 <button
                   type="button"
                   onClick={() => {
@@ -395,7 +395,7 @@ const SignUp = () => {
                   </svg>
                   Google
                 </button>
-              </div>
+              </div> */}
 
               {/* Sign In Link */}
               <div className="mt-6 text-center">
