@@ -147,16 +147,16 @@ const Header = () => {
           { name: 'GEOMETRIC PRINTED SAREES', path: '/category/printed-sarees/geometric-printed-sarees' }
         ]
       },
-      { 
-        name: 'JEWELLERY', 
-        path: '/category/jewellery',
-        subcategories: [
-          { name: 'NECKLACE', path: '/category/jewellery/necklace' },
-          { name: 'EARRINGS', path: '/category/jewellery/earrings' },
-          { name: 'BRACELETS', path: '/category/jewellery/bracelets' },
-          { name: 'BANGLES', path: '/category/jewellery/bangles' }
-        ]
-      }
+      // { 
+      //   name: 'JEWELLERY', 
+      //   path: '/category/jewellery',
+      //   subcategories: [
+      //     { name: 'NECKLACE', path: '/category/jewellery/necklace' },
+      //     { name: 'EARRINGS', path: '/category/jewellery/earrings' },
+      //     { name: 'BRACELETS', path: '/category/jewellery/bracelets' },
+      //     { name: 'BANGLES', path: '/category/jewellery/bangles' }
+      //   ]
+      // }
   ];
 
   // Close dropdown when clicking outside
@@ -223,7 +223,7 @@ const Header = () => {
         <div className="hidden md:block relative z-50" ref={headerRef}>
           <div className="w-full py-3 relative" style={{ overflowY: 'visible' }}>
             <div className="w-full overflow-x-auto overflow-y-visible hide-scrollbar scroll-smooth">
-              <div className="flex items-center space-x-8 min-w-max px-4 sm:px-6 lg:px-8">
+              <div className="flex items-center justify-center space-x-8 min-w-max px-4 sm:px-6 lg:px-8">
                 {categories.map((category) => (
                   <div key={category.name} className="relative group shrink-0">
                     <div 
@@ -291,7 +291,7 @@ const Header = () => {
         <div className="md:hidden relative z-50">
           {/* Main Categories - Horizontal Scrollable */}
           <div className="w-full overflow-x-auto overflow-y-hidden hide-scrollbar sticky top-16 z-50 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/70 border-b border-gray-200">
-            <div className="flex space-x-1 px-4 pt-3 pb-2 min-w-max">
+            <div className="flex justify-center space-x-1 px-4 pt-3 pb-2 min-w-max">
               {categories.map((category) => (
                 <div key={category.name} className="shrink-0">
                   <button
