@@ -98,7 +98,6 @@ const Header = () => {
     { name: 'BAGRU PRINT COTTON SAREES', path: '/category/cotton/bagru-print-cotton-sarees' },
     { name: 'AJRAKH PRINT COTTON SAREES', path: '/category/cotton/ajrakh-print-cotton-sarees' },
     { name: 'IKKAT COTTON SAREES', path: '/category/cotton/ikkat-cotton-sarees' },
-    { name: 'CHANDERI COTTON SILKS', path: '/category/cotton/chanderi-cotton-silks' },
     { name: 'KALAMKARI COTTON SAREES', path: '/category/cotton/kalamkari-cotton-sarees' },]
   
       },
