@@ -38,9 +38,17 @@ if (process.env.NODE_ENV === 'production') {
     .map(([key]) => key);
   
   if (missing.length > 0) {
-    console.error('❌ CRITICAL: Missing required environment variables in production:');
-    missing.forEach(key => console.error(`   - ${key}`));
-    console.error('PayU payments will NOT work without these variables!');
+    console.warn('⚠️  WARNING: Missing recommended environment variables in production:');
+    missing.forEach(key => {
+      if (key === 'BACKEND_URL' || key === 'FRONTEND_URL') {
+        console.warn(`   - ${key} (will auto-detect from requests, but should be set for reliability)`);
+      } else {
+        console.error(`   - ${key} (REQUIRED - PayU will not work without this)`);
+      }
+    });
+    if (missing.some(key => key !== 'BACKEND_URL' && key !== 'FRONTEND_URL')) {
+      console.error('PayU payments will NOT work without PAYU_KEY and PAYU_SALT!');
+    }
   } else {
     console.log('✅ All PayU environment variables are configured');
     console.log('Backend URL:', process.env.BACKEND_URL);

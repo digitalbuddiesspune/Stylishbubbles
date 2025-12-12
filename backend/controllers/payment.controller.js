@@ -86,32 +86,54 @@ export const createPayUTxn = async (req, res) => {
 
     // Backend callback URLs (PayU sends POST here first, then redirects user via GET)
     // For production, BACKEND_URL MUST be set to your live backend URL
-    const BACKEND_URL = process.env.BACKEND_URL;
+    let BACKEND_URL = process.env.BACKEND_URL;
     
+    // Auto-detect from request if not set (fallback for quick fix)
     if (!BACKEND_URL && process.env.NODE_ENV === 'production') {
-      console.error('❌ CRITICAL: BACKEND_URL environment variable is not set in production!');
-      console.error('PayU callbacks will fail. Please set BACKEND_URL in your AWS environment variables.');
-      return res.status(500).json({ 
-        error: 'Server configuration error: BACKEND_URL not set',
-        details: 'Please contact support'
-      });
+      const protocol = req.protocol || (req.secure ? 'https' : 'http');
+      const host = req.get('host') || req.headers.host;
+      if (host) {
+        BACKEND_URL = `${protocol}://${host}`;
+        console.warn('⚠️  WARNING: BACKEND_URL not set, auto-detected from request:', BACKEND_URL);
+        console.warn('⚠️  Please set BACKEND_URL environment variable in Render for reliability!');
+      } else {
+        console.error('❌ CRITICAL: BACKEND_URL environment variable is not set and cannot be auto-detected!');
+        console.error('Please set BACKEND_URL in your Render environment variables.');
+        return res.status(500).json({ 
+          error: 'Server configuration error: BACKEND_URL not set',
+          details: 'Please set BACKEND_URL environment variable in Render dashboard'
+        });
+      }
     }
     
     const backendUrl = BACKEND_URL || `http://localhost:${process.env.PORT || 5000}`;
-    const callbackSuccessUrl = process.env.PAYU_CALLBACK_SUCCESS_URL || `${backendUrl}/api/payment/payu/callback?status=success`;
-    const callbackFailUrl = process.env.PAYU_CALLBACK_FAIL_URL || `${backendUrl}/api/payment/payu/callback?status=fail`;
+    // Support both PAYU_CALLBACK_URL (legacy) and PAYU_CALLBACK_SUCCESS_URL/PAYU_CALLBACK_FAIL_URL
+    const callbackSuccessUrl = process.env.PAYU_CALLBACK_SUCCESS_URL || 
+      process.env.PAYU_CALLBACK_URL || 
+      `${backendUrl}/api/payment/payu/callback?status=success`;
+    const callbackFailUrl = process.env.PAYU_CALLBACK_FAIL_URL || 
+      process.env.PAYU_CALLBACK_URL || 
+      `${backendUrl}/api/payment/payu/callback?status=fail`;
 
     // Frontend redirect URLs (where user is redirected after backend processes POST)
     // For production, FRONTEND_URL MUST be set to your live frontend URL
-    const FRONTEND_URL = process.env.FRONTEND_URL;
+    let FRONTEND_URL = process.env.FRONTEND_URL;
     
     if (!FRONTEND_URL && process.env.NODE_ENV === 'production') {
-      console.error('❌ CRITICAL: FRONTEND_URL environment variable is not set in production!');
-      console.error('Payment redirects will fail. Please set FRONTEND_URL in your AWS environment variables.');
-      return res.status(500).json({ 
-        error: 'Server configuration error: FRONTEND_URL not set',
-        details: 'Please contact support'
-      });
+      // Try to get from request origin (frontend making the request)
+      const origin = req.headers.origin;
+      if (origin && origin.includes('vercel.app') || origin.includes('onrender.com') || origin.includes('netlify.app')) {
+        FRONTEND_URL = origin;
+        console.warn('⚠️  WARNING: FRONTEND_URL not set, using request origin:', FRONTEND_URL);
+        console.warn('⚠️  Please set FRONTEND_URL environment variable in Render for reliability!');
+      } else {
+        console.error('❌ CRITICAL: FRONTEND_URL environment variable is not set and cannot be auto-detected!');
+        console.error('Please set FRONTEND_URL in your Render environment variables.');
+        return res.status(500).json({ 
+          error: 'Server configuration error: FRONTEND_URL not set',
+          details: 'Please set FRONTEND_URL environment variable in Render dashboard'
+        });
+      }
     }
     
     const frontendUrl = FRONTEND_URL || 'http://localhost:5174';
@@ -184,12 +206,26 @@ export const verifyPayUPayment = async (req, res) => {
 
     // Frontend redirect URLs
     // For production, FRONTEND_URL MUST be set to your live frontend URL
-    const FRONTEND_URL = process.env.FRONTEND_URL;
+    let FRONTEND_URL = process.env.FRONTEND_URL;
     
     if (!FRONTEND_URL && process.env.NODE_ENV === 'production') {
-      console.error('❌ CRITICAL: FRONTEND_URL environment variable is not set in production!');
-      const frontendFailUrl = 'http://localhost:5174/payment-fail'; // Fallback
-      return res.redirect(`${frontendFailUrl}?error=Server configuration error`);
+      // Try to get from request origin or referer
+      const origin = req.headers.origin || req.headers.referer;
+      if (origin) {
+        try {
+          const url = new URL(origin);
+          FRONTEND_URL = `${url.protocol}//${url.host}`;
+          console.warn('⚠️  WARNING: FRONTEND_URL not set, using request origin:', FRONTEND_URL);
+        } catch {
+          // Invalid URL, use fallback
+        }
+      }
+      
+      if (!FRONTEND_URL) {
+        console.error('❌ CRITICAL: FRONTEND_URL environment variable is not set and cannot be auto-detected!');
+        const frontendFailUrl = 'http://localhost:5174/payment-fail'; // Fallback
+        return res.redirect(`${frontendFailUrl}?error=Server configuration error`);
+      }
     }
     
     const frontendUrl = FRONTEND_URL || 'http://localhost:5174';
