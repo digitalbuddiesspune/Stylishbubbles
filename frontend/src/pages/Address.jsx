@@ -67,6 +67,7 @@ export default function AddressForm() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [showForm, setShowForm] = useState(true);
   const [userEmail, setUserEmail] = useState('');
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const { cart, cartTotal: total, loadCart } = useCart();
 
   // Calculate price details
@@ -93,6 +94,12 @@ export default function AddressForm() {
   const priceDetails = calculatePriceDetails();
 
   const handlePayment = async () => {
+    // Prevent multiple simultaneous payment requests
+    if (isProcessingPayment) {
+      console.warn('Payment already in progress, ignoring duplicate request');
+      return;
+    }
+
     if (!hasSavedAddress) {
       alert('Please save your delivery address first.');
       return;
@@ -109,10 +116,20 @@ export default function AddressForm() {
       return;
     }
     
+    // Check if form already exists (prevent duplicate submissions)
+    const existingForm = document.getElementById('payuForm');
+    if (existingForm) {
+      console.warn('PayU form already exists, removing old form');
+      existingForm.remove();
+    }
+    
+    setIsProcessingPayment(true);
+    
     try {
       const amount = priceDetails.total;
       if (!amount || amount <= 0) {
         alert('Invalid order amount. Please check your cart.');
+        setIsProcessingPayment(false);
         return;
       }
       
@@ -185,12 +202,13 @@ export default function AddressForm() {
 
       document.body.appendChild(form);
       
-      // Auto-submit the form
+      // Auto-submit the form (don't reset isProcessingPayment as we're navigating away)
       form.submit();
     } catch (e) {
       console.error('Payment error:', e);
       const errorMessage = e.message || 'Unable to start payment. Please try again.';
       alert(errorMessage);
+      setIsProcessingPayment(false);
     }
   };
 
@@ -753,10 +771,14 @@ export default function AddressForm() {
 
             <button 
               onClick={handlePayment}
-              disabled={!hasSavedAddress}
-              className={`w-full mt-4 py-3 px-4 rounded-md transition-colors font-medium cursor-pointer ${hasSavedAddress ? 'bg-black text-white hover:bg-gray-800' : 'bg-gray-300 text-gray-600 cursor-not-allowed'}`}
+              disabled={!hasSavedAddress || isProcessingPayment}
+              className={`w-full mt-4 py-3 px-4 rounded-md transition-colors font-medium ${
+                !hasSavedAddress || isProcessingPayment
+                  ? 'bg-gray-300 text-gray-600 cursor-not-allowed' 
+                  : 'bg-black text-white hover:bg-gray-800 cursor-pointer'
+              }`}
             >
-              PROCEED TO PAYMENT
+              {isProcessingPayment ? 'PROCESSING...' : 'PROCEED TO PAYMENT'}
             </button>
           </div>
         </div>

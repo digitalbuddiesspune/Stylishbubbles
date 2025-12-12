@@ -3,10 +3,54 @@ import Cart from '../models/Cart.js';
 import Order from '../models/Order.js';
 import { Address } from '../models/Address.js';
 
+// In-memory cache to prevent duplicate payment requests (TTL: 60 seconds)
+const paymentRequestCache = new Map();
+const PAYMENT_REQUEST_TTL = 60 * 1000; // 60 seconds
+
+// Helper to check and prevent duplicate requests
+const checkDuplicateRequest = (userId, amount, email) => {
+  // Create cache key from user identifier and amount
+  const cacheKey = `${userId || email}_${amount}`;
+  
+  // Check if there's a recent request for this user+amount
+  const cached = paymentRequestCache.get(cacheKey);
+  const now = Date.now();
+  
+  if (cached && (now - cached.timestamp) < PAYMENT_REQUEST_TTL) {
+    return true; // Duplicate request detected
+  }
+  
+  // Store this request with current timestamp
+  paymentRequestCache.set(cacheKey, { timestamp: now });
+  
+  // Clean up old entries (older than TTL) periodically
+  // Only clean up every 10th request to avoid performance impact
+  if (Math.random() < 0.1) {
+    for (const [key, value] of paymentRequestCache.entries()) {
+      if (now - value.timestamp > PAYMENT_REQUEST_TTL) {
+        paymentRequestCache.delete(key);
+      }
+    }
+  }
+  
+  return false; // Not a duplicate
+};
+
 // PayU transaction creation
 export const createPayUTxn = async (req, res) => {
   try {
     const { amount, name, email, phone } = req.body;
+    
+    // Prevent duplicate payment requests (rate limiting protection)
+    const requestUserId = req.userId || null;
+    const isDuplicate = checkDuplicateRequest(requestUserId, amount, email);
+    if (isDuplicate) {
+      console.warn('⚠️  Duplicate payment request detected:', { userId: requestUserId, email, amount });
+      return res.status(429).json({ 
+        error: 'Too many requests. Please wait a moment before trying again.',
+        retryAfter: 60
+      });
+    }
     
     // Validate required fields with detailed error messages
     const missingFields = [];
@@ -85,13 +129,68 @@ export const createPayUTxn = async (req, res) => {
     const hash = crypto.createHash('sha512').update(hashString).digest('hex');
 
     // Backend callback URLs (PayU sends POST here first, then redirects user via GET)
-    const BACKEND_URL = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 7000}`;
-    const callbackSuccessUrl = process.env.PAYU_CALLBACK_SUCCESS_URL || `${BACKEND_URL}/api/payment/payu/callback?status=success`;
-    const callbackFailUrl = process.env.PAYU_CALLBACK_FAIL_URL || `${BACKEND_URL}/api/payment/payu/callback?status=fail`;
+    // For production, BACKEND_URL MUST be set to your live backend URL
+    let BACKEND_URL = process.env.BACKEND_URL;
+    
+    // Auto-detect from request if not set (fallback for quick fix)
+    if (!BACKEND_URL && process.env.NODE_ENV === 'production') {
+      const protocol = req.protocol || (req.secure ? 'https' : 'http');
+      const host = req.get('host') || req.headers.host;
+      if (host) {
+        BACKEND_URL = `${protocol}://${host}`;
+        console.warn('⚠️  WARNING: BACKEND_URL not set, auto-detected from request:', BACKEND_URL);
+        console.warn('⚠️  Please set BACKEND_URL environment variable in Render for reliability!');
+      } else {
+        console.error('❌ CRITICAL: BACKEND_URL environment variable is not set and cannot be auto-detected!');
+        console.error('Please set BACKEND_URL in your Render environment variables.');
+        return res.status(500).json({ 
+          error: 'Server configuration error: BACKEND_URL not set',
+          details: 'Please set BACKEND_URL environment variable in Render dashboard'
+        });
+      }
+    }
+    
+    const backendUrl = BACKEND_URL || `http://localhost:${process.env.PORT || 5000}`;
+    // Support both PAYU_CALLBACK_URL (legacy) and PAYU_CALLBACK_SUCCESS_URL/PAYU_CALLBACK_FAIL_URL
+    const callbackSuccessUrl = process.env.PAYU_CALLBACK_SUCCESS_URL || 
+      process.env.PAYU_CALLBACK_URL || 
+      `${backendUrl}/api/payment/payu/callback?status=success`;
+    const callbackFailUrl = process.env.PAYU_CALLBACK_FAIL_URL || 
+      process.env.PAYU_CALLBACK_URL || 
+      `${backendUrl}/api/payment/payu/callback?status=fail`;
 
     // Frontend redirect URLs (where user is redirected after backend processes POST)
-    const frontendSuccessUrl = process.env.PAYU_SUCCESS_URL || `${process.env.FRONTEND_URL || 'http://localhost:5174'}/payment-success`;
-    const frontendFailUrl = process.env.PAYU_FAIL_URL || `${process.env.FRONTEND_URL || 'http://localhost:5174'}/payment-fail`;
+    // For production, FRONTEND_URL MUST be set to your live frontend URL
+    let FRONTEND_URL = process.env.FRONTEND_URL;
+    
+    if (!FRONTEND_URL && process.env.NODE_ENV === 'production') {
+      // Try to get from request origin (frontend making the request)
+      const origin = req.headers.origin;
+      if (origin && (origin.includes('vercel.app') || origin.includes('onrender.com') || origin.includes('netlify.app'))) {
+        FRONTEND_URL = origin;
+        console.warn('⚠️  WARNING: FRONTEND_URL not set, using request origin:', FRONTEND_URL);
+        console.warn('⚠️  Please set FRONTEND_URL environment variable in Render for reliability!');
+      } else {
+        console.error('❌ CRITICAL: FRONTEND_URL environment variable is not set and cannot be auto-detected!');
+        console.error('Please set FRONTEND_URL in your Render environment variables.');
+        return res.status(500).json({ 
+          error: 'Server configuration error: FRONTEND_URL not set',
+          details: 'Please set FRONTEND_URL environment variable in Render dashboard'
+        });
+      }
+    }
+    
+    const frontendUrl = FRONTEND_URL || 'http://localhost:5174';
+    const frontendSuccessUrl = process.env.PAYU_SUCCESS_URL || `${frontendUrl}/payment-success`;
+    const frontendFailUrl = process.env.PAYU_FAIL_URL || `${frontendUrl}/payment-fail`;
+    
+    // Log URLs for debugging (remove sensitive data in production)
+    console.log('PayU URLs configured:', {
+      backendUrl: backendUrl.replace(/\/\/.*@/, '//***@'), // Hide credentials if any
+      frontendUrl,
+      callbackSuccessUrl: callbackSuccessUrl.replace(/\/\/.*@/, '//***@'),
+      callbackFailUrl: callbackFailUrl.replace(/\/\/.*@/, '//***@'),
+    });
 
     // Store txnid -> userId mapping if userId is available (from optional auth)
     // This helps us find the user during callback when PayU sends POST
@@ -150,13 +249,45 @@ export const verifyPayUPayment = async (req, res) => {
     } = dataSource;
 
     // Frontend redirect URLs
-    const frontendSuccessUrl = process.env.PAYU_SUCCESS_URL || `${process.env.FRONTEND_URL || 'http://localhost:5174'}/payment-success`;
-    const frontendFailUrl = process.env.PAYU_FAIL_URL || `${process.env.FRONTEND_URL || 'http://localhost:5174'}/payment-fail`;
+    // For production, FRONTEND_URL MUST be set to your live frontend URL
+    let FRONTEND_URL = process.env.FRONTEND_URL;
+    
+    if (!FRONTEND_URL && process.env.NODE_ENV === 'production') {
+      // Try to get from request origin or referer
+      const origin = req.headers.origin || req.headers.referer;
+      if (origin) {
+        try {
+          const url = new URL(origin);
+          FRONTEND_URL = `${url.protocol}//${url.host}`;
+          console.warn('⚠️  WARNING: FRONTEND_URL not set, using request origin:', FRONTEND_URL);
+        } catch {
+          // Invalid URL, use fallback
+        }
+      }
+      
+      if (!FRONTEND_URL) {
+        console.error('❌ CRITICAL: FRONTEND_URL environment variable is not set and cannot be auto-detected!');
+        const frontendFailUrl = 'http://localhost:5174/payment-fail'; // Fallback
+        const params = new URLSearchParams({
+          error: 'Server configuration error',
+          status: 'failed'
+        });
+        return res.redirect(`${frontendFailUrl}?${params.toString()}`);
+      }
+    }
+    
+    const frontendUrl = FRONTEND_URL || 'http://localhost:5174';
+    const frontendSuccessUrl = process.env.PAYU_SUCCESS_URL || `${frontendUrl}/payment-success`;
+    const frontendFailUrl = process.env.PAYU_FAIL_URL || `${frontendUrl}/payment-fail`;
 
     // If GET request without required data, redirect to fail page
     if (!isPost && (!txnid || !status)) {
       console.warn('PayU callback: GET request without required data, redirecting to fail');
-      return res.redirect(`${frontendFailUrl}?error=Invalid callback data`);
+      const params = new URLSearchParams({
+        error: 'Invalid callback data',
+        status: 'failed'
+      });
+      return res.redirect(`${frontendFailUrl}?${params.toString()}`);
     }
 
     // For POST requests (PayU server callback), verify and process payment
@@ -164,7 +295,12 @@ export const verifyPayUPayment = async (req, res) => {
       if (!txnid || !amount || !hash) {
         console.error('PayU POST callback: Missing required fields');
         // Still redirect user to fail page
-        return res.redirect(`${frontendFailUrl}?error=Missing required fields`);
+        const params = new URLSearchParams({
+          error: 'Missing required fields',
+          status: 'failed',
+          txnid: txnid || ''
+        });
+        return res.redirect(`${frontendFailUrl}?${params.toString()}`);
       }
 
       const salt = process.env.PAYU_SALT;
@@ -172,16 +308,30 @@ export const verifyPayUPayment = async (req, res) => {
 
       if (!salt || !payuKey) {
         console.error('PayU POST callback: Server secret missing');
-        return res.redirect(`${frontendFailUrl}?error=Server configuration error`);
+        const params = new URLSearchParams({
+          error: 'Server configuration error',
+          status: 'failed',
+          txnid: txnid || ''
+        });
+        return res.redirect(`${frontendFailUrl}?${params.toString()}`);
       }
 
       // Verify hash: key|txnid|amount|productinfo|firstname|email|status|||||||||||salt
-      const hashString = `${payuKey}|${txnid}|${amount}|${productinfo}|${firstname}|${email}|${status}|||||||||||${salt}`;
+      const hashString = `${payuKey}|${txnid}|${amount}|${productinfo || ''}|${firstname || ''}|${email || ''}|${status}|||||||||||${salt}`;
       const expectedHash = crypto.createHash('sha512').update(hashString).digest('hex');
 
       if (expectedHash !== hash) {
-        console.error('PayU hash verification failed');
-        return res.redirect(`${frontendFailUrl}?error=Invalid hash verification`);
+        console.error('PayU hash verification failed', {
+          txnid,
+          expectedHash: expectedHash.substring(0, 20) + '...',
+          receivedHash: hash ? hash.substring(0, 20) + '...' : 'missing'
+        });
+        const params = new URLSearchParams({
+          error: 'Invalid hash verification',
+          status: 'failed',
+          txnid: txnid || ''
+        });
+        return res.redirect(`${frontendFailUrl}?${params.toString()}`);
       }
 
       // Hash verified - payment is legitimate
@@ -261,16 +411,48 @@ export const verifyPayUPayment = async (req, res) => {
     }
 
     // After processing POST (or for GET requests), redirect user to frontend
-    // Build redirect URL with transaction details
-    const redirectUrl = status === 'success' 
-      ? `${frontendSuccessUrl}?txnid=${txnid}&status=${status}${mihpayid ? `&mihpayid=${mihpayid}` : ''}`
-      : `${frontendFailUrl}?txnid=${txnid || ''}&status=${status || 'failed'}${error_Message ? `&error=${encodeURIComponent(error_Message)}` : error ? `&error=${encodeURIComponent(error)}` : ''}`;
+    // Build redirect URL with transaction details (properly encoded)
+    let redirectUrl;
+    if (status === 'success') {
+      const params = new URLSearchParams({
+        txnid: txnid || '',
+        status: status || 'success'
+      });
+      if (mihpayid) params.append('mihpayid', mihpayid);
+      if (bank_ref_num) params.append('bank_ref_num', bank_ref_num);
+      redirectUrl = `${frontendSuccessUrl}?${params.toString()}`;
+    } else {
+      const params = new URLSearchParams({
+        txnid: txnid || '',
+        status: status || 'failed'
+      });
+      if (error_Message) {
+        params.append('error', error_Message);
+      } else if (error) {
+        params.append('error', error);
+      } else {
+        params.append('error', 'Payment failed');
+      }
+      redirectUrl = `${frontendFailUrl}?${params.toString()}`;
+    }
+
+    console.log('PayU redirect:', {
+      status,
+      redirectUrl: redirectUrl.replace(/\/\/.*@/, '//***@'), // Hide credentials if any
+      txnid
+    });
 
     return res.redirect(redirectUrl);
   } catch (err) {
     console.error('PayU verifyPayment error:', err?.message || err);
-    const frontendFailUrl = process.env.PAYU_FAIL_URL || `${process.env.FRONTEND_URL || 'http://localhost:5174'}/payment-fail`;
-    return res.redirect(`${frontendFailUrl}?error=Verification failed`);
+    const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5174';
+    const frontendFailUrl = process.env.PAYU_FAIL_URL || `${FRONTEND_URL}/payment-fail`;
+    const errorMsg = err?.message || 'Verification failed';
+    const params = new URLSearchParams({
+      error: errorMsg,
+      status: 'failed'
+    });
+    return res.redirect(`${frontendFailUrl}?${params.toString()}`);
   }
 };
 

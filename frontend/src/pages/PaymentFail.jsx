@@ -7,10 +7,10 @@ const PaymentFail = () => {
   const errorMsg = searchParams.get('error') || searchParams.get('error_Message') || searchParams.get('error_message') || 'Payment failed';
 
   useEffect(() => {
-    // Auto-redirect to profile after 3 seconds (reduced from 5)
+    // Auto-redirect to profile after 5 seconds
     const timer = setTimeout(() => {
       navigate('/profile?tab=orders', { replace: true });
-    }, 3000);
+    }, 5000);
 
     return () => clearTimeout(timer);
   }, [navigate]);
@@ -26,6 +26,11 @@ const PaymentFail = () => {
         <h2 className="text-2xl font-semibold text-gray-900 mb-2">Payment Failed</h2>
         <p className="text-gray-600 mb-6">{errorMsg}</p>
         <p className="text-sm text-gray-500 mb-6">Redirecting to orders page in 5 seconds...</p>
+        {errorMsg && errorMsg.includes('Too many requests') && (
+          <p className="text-sm text-amber-600 mb-4 font-medium">
+            ⚠️ Please wait 60 seconds before trying again.
+          </p>
+        )}
         <div className="flex gap-4 justify-center">
           <button
             onClick={() => navigate('/checkout/address', { replace: true })}

@@ -22,11 +22,11 @@ const PaymentSuccess = () => {
         allParams: Object.fromEntries(searchParams.entries())
       });
 
-      // Always redirect to profile after a short delay, regardless of verification
+      // Always redirect to profile after a delay, regardless of verification
       // Verification is optional and happens in background
       const redirectTimer = setTimeout(() => {
         navigate('/profile?tab=orders', { replace: true });
-      }, 2000);
+      }, 3000); // Increased to 3 seconds to allow verification to complete
 
       // Try to verify in background (non-blocking)
       if (txnid) {
