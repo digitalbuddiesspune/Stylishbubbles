@@ -68,6 +68,7 @@ export default function AddressForm() {
   const [showForm, setShowForm] = useState(true);
   const [userEmail, setUserEmail] = useState('');
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [formSubmitted, setFormSubmitted] = useState(false);
   const { cart, cartTotal: total, loadCart } = useCart();
 
   // Calculate price details
@@ -200,15 +201,43 @@ export default function AddressForm() {
       addField('furl', payuData.furl);
       addField('hash', payuData.hash);
 
+      // Prevent multiple form submissions
+      if (formSubmitted) {
+        console.warn('Form already submitted, preventing duplicate submission');
+        setIsProcessingPayment(false);
+        return;
+      }
+
+      // Mark form as submitted BEFORE appending to DOM
+      setFormSubmitted(true);
+      
+      // Add submit event listener to prevent double submission
+      let submitCount = 0;
+      form.addEventListener('submit', (e) => {
+        submitCount++;
+        console.log('Form submit event triggered, count:', submitCount);
+        if (submitCount > 1) {
+          console.warn('Preventing duplicate form submission');
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+      }, { once: true });
+
       document.body.appendChild(form);
       
       // Auto-submit the form (don't reset isProcessingPayment as we're navigating away)
-      form.submit();
+      // Use setTimeout to ensure form is fully in DOM before submission
+      setTimeout(() => {
+        console.log('Submitting PayU form with txnid:', payuData.txnid);
+        form.submit();
+      }, 100);
     } catch (e) {
       console.error('Payment error:', e);
       const errorMessage = e.message || 'Unable to start payment. Please try again.';
       alert(errorMessage);
       setIsProcessingPayment(false);
+      setFormSubmitted(false); // Reset on error so user can retry
     }
   };
 
@@ -771,14 +800,14 @@ export default function AddressForm() {
 
             <button 
               onClick={handlePayment}
-              disabled={!hasSavedAddress || isProcessingPayment}
+              disabled={!hasSavedAddress || isProcessingPayment || formSubmitted}
               className={`w-full mt-4 py-3 px-4 rounded-md transition-colors font-medium ${
-                !hasSavedAddress || isProcessingPayment
+                !hasSavedAddress || isProcessingPayment || formSubmitted
                   ? 'bg-gray-300 text-gray-600 cursor-not-allowed' 
                   : 'bg-black text-white hover:bg-gray-800 cursor-pointer'
               }`}
             >
-              {isProcessingPayment ? 'PROCESSING...' : 'PROCEED TO PAYMENT'}
+              {formSubmitted ? 'REDIRECTING TO PAYU...' : isProcessingPayment ? 'PROCESSING...' : 'PROCEED TO PAYMENT'}
             </button>
           </div>
         </div>

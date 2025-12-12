@@ -100,7 +100,9 @@ export const createPayUTxn = async (req, res) => {
       console.warn('⚠️  Auto-corrected SALT to:', salt);
     }
 
-    const txnid = 'txn' + Date.now();
+    // Generate unique transaction ID with timestamp and random component
+    // This ensures even rapid requests get unique txnids
+    const txnid = 'txn' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
     const productinfo = 'Order';
 
     // PayU hash string format: key|txnid|amount|productinfo|firstname|email|udf1|udf2|udf3|udf4|udf5||||||SALT
