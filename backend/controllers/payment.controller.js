@@ -17,11 +17,16 @@ const checkDuplicateRequest = (userId, amount, email) => {
   const now = Date.now();
   
   if (cached && (now - cached.timestamp) < PAYMENT_REQUEST_TTL) {
+    console.warn('⚠️  Duplicate request detected in cache:', {
+      cacheKey,
+      timeSinceLastRequest: now - cached.timestamp,
+      ttl: PAYMENT_REQUEST_TTL
+    });
     return true; // Duplicate request detected
   }
   
   // Store this request with current timestamp
-  paymentRequestCache.set(cacheKey, { timestamp: now });
+  paymentRequestCache.set(cacheKey, { timestamp: now, userId, email, amount });
   
   // Clean up old entries (older than TTL) periodically
   // Only clean up every 10th request to avoid performance impact

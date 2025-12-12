@@ -95,9 +95,20 @@ export default function AddressForm() {
   const priceDetails = calculatePriceDetails();
 
   const handlePayment = async () => {
+    // Check sessionStorage for recent payment attempt (prevents duplicate even after page reload)
+    const lastPaymentAttempt = sessionStorage.getItem('lastPaymentAttempt');
+    const lastPaymentTime = lastPaymentAttempt ? parseInt(lastPaymentAttempt, 10) : 0;
+    const timeSinceLastPayment = Date.now() - lastPaymentTime;
+    
+    if (timeSinceLastPayment < 5000) { // 5 seconds cooldown
+      console.warn('Payment attempt too soon after last attempt, please wait');
+      alert('Please wait a few seconds before trying again.');
+      return;
+    }
+
     // Prevent multiple simultaneous payment requests
-    if (isProcessingPayment) {
-      console.warn('Payment already in progress, ignoring duplicate request');
+    if (isProcessingPayment || formSubmitted) {
+      console.warn('Payment already in progress or form already submitted, ignoring duplicate request');
       return;
     }
 
@@ -123,6 +134,9 @@ export default function AddressForm() {
       console.warn('PayU form already exists, removing old form');
       existingForm.remove();
     }
+    
+    // Store payment attempt timestamp
+    sessionStorage.setItem('lastPaymentAttempt', Date.now().toString());
     
     setIsProcessingPayment(true);
     
@@ -208,29 +222,68 @@ export default function AddressForm() {
         return;
       }
 
+      // Store transaction ID in sessionStorage to prevent reuse
+      const existingTxnId = sessionStorage.getItem('payuTxnId');
+      if (existingTxnId === payuData.txnid) {
+        console.warn('Transaction ID already used, preventing duplicate submission');
+        setIsProcessingPayment(false);
+        alert('This payment is already being processed. Please wait...');
+        return;
+      }
+
       // Mark form as submitted BEFORE appending to DOM
       setFormSubmitted(true);
       
+      // Store transaction ID to prevent reuse
+      sessionStorage.setItem('payuTxnId', payuData.txnid);
+      sessionStorage.setItem('payuFormSubmitted', 'true');
+      
       // Add submit event listener to prevent double submission
       let submitCount = 0;
-      form.addEventListener('submit', (e) => {
+      const submitHandler = (e) => {
         submitCount++;
         console.log('Form submit event triggered, count:', submitCount);
         if (submitCount > 1) {
           console.warn('Preventing duplicate form submission');
           e.preventDefault();
           e.stopPropagation();
+          e.stopImmediatePropagation();
           return false;
         }
-      }, { once: true });
+        // Remove listener after first submit
+        form.removeEventListener('submit', submitHandler);
+      };
+      
+      form.addEventListener('submit', submitHandler, { capture: true, once: false });
 
+      // Disable form submission via other means
+      form.setAttribute('data-submitted', 'true');
+      
       document.body.appendChild(form);
       
       // Auto-submit the form (don't reset isProcessingPayment as we're navigating away)
       // Use setTimeout to ensure form is fully in DOM before submission
       setTimeout(() => {
+        // Double check form hasn't been removed or already submitted
+        const formElement = document.getElementById('payuForm');
+        if (!formElement || formElement.getAttribute('data-submitted') !== 'true') {
+          console.warn('Form was removed or modified, aborting submission');
+          setIsProcessingPayment(false);
+          setFormSubmitted(false);
+          sessionStorage.removeItem('payuTxnId');
+          sessionStorage.removeItem('payuFormSubmitted');
+          return;
+        }
+        
         console.log('Submitting PayU form with txnid:', payuData.txnid);
-        form.submit();
+        // Use requestSubmit instead of submit for better control
+        try {
+          formElement.requestSubmit();
+        } catch (err) {
+          // Fallback to submit if requestSubmit not supported
+          console.log('requestSubmit not supported, using submit');
+          formElement.submit();
+        }
       }, 100);
     } catch (e) {
       console.error('Payment error:', e);
@@ -238,6 +291,7 @@ export default function AddressForm() {
       alert(errorMessage);
       setIsProcessingPayment(false);
       setFormSubmitted(false); // Reset on error so user can retry
+      // Don't clear sessionStorage on error - keep cooldown active
     }
   };
 
@@ -366,6 +420,17 @@ export default function AddressForm() {
   useEffect(() => {
     const load = async () => {
       try {
+        // Check if form was already submitted (prevent duplicate on page reload)
+        const formWasSubmitted = sessionStorage.getItem('payuFormSubmitted');
+        if (formWasSubmitted === 'true') {
+          console.warn('Payment form was already submitted, clearing state after delay');
+          // Clear after 10 seconds to allow retry
+          setTimeout(() => {
+            sessionStorage.removeItem('payuFormSubmitted');
+            sessionStorage.removeItem('payuTxnId');
+          }, 10000);
+        }
+        
         setLoadingAddress(true);
         // Fetch user email
         try {
