@@ -49,6 +49,20 @@ const Contact = () => {
               </div>
             </div>
           </div>
+             <div className="mb-12">
+            <h2 className="text-3xl font-light tracking-wider mb-6 text-gray-900 text-center">
+              COMPANY DETAILS
+            </h2>
+            <div className="flex items-start space-x-4 p-6 bg-white border-2 border-gray-200 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300">
+              <div className="text-3xl text-amber-600">📧</div>
+              <div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Company Name</h3>
+                <p className="text-gray-700">
+                    Wokify Ventures (OPC) Private Limited
+                </p>
+              </div>
+            </div>
+          </div>
 
           {/* Open Hours */}
           <div>

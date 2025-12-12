@@ -179,7 +179,7 @@ const Footer = () => {
             © {currentYear} <span className="font-semibold text-white">STYLISHBUBBLES</span>. All rights reserved.
           </p>
           <p className="text-xs text-gray-400 mb-2">
-            GSTIN: 27ABCDE1234F1Z5 | CIN: U74999MH2020PTC123456
+            GSTIN: 07AAECW0067G1ZF | CIN: U47912DL2025OPC441192
           </p>
           <div className="flex justify-center space-x-4 text-xs text-gray-400">
             <Link to="/privacy" onClick={scrollToTop} className="hover:text-rose-500 transition-colors duration-200">
