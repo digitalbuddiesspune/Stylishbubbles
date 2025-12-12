@@ -85,22 +85,46 @@ export const createPayUTxn = async (req, res) => {
     const hash = crypto.createHash('sha512').update(hashString).digest('hex');
 
     // Backend callback URLs (PayU sends POST here first, then redirects user via GET)
-    // For production, BACKEND_URL should be set to your live backend URL (e.g., https://your-backend.onrender.com)
-    const BACKEND_URL = process.env.BACKEND_URL || (process.env.NODE_ENV === 'production' 
-      ? `https://your-backend-domain.com` 
-      : `http://localhost:${process.env.PORT || 5000}`);
+    // For production, BACKEND_URL MUST be set to your live backend URL
+    const BACKEND_URL = process.env.BACKEND_URL;
     
-    const callbackSuccessUrl = process.env.PAYU_CALLBACK_SUCCESS_URL || `${BACKEND_URL}/api/payment/payu/callback?status=success`;
-    const callbackFailUrl = process.env.PAYU_CALLBACK_FAIL_URL || `${BACKEND_URL}/api/payment/payu/callback?status=fail`;
+    if (!BACKEND_URL && process.env.NODE_ENV === 'production') {
+      console.error('❌ CRITICAL: BACKEND_URL environment variable is not set in production!');
+      console.error('PayU callbacks will fail. Please set BACKEND_URL in your AWS environment variables.');
+      return res.status(500).json({ 
+        error: 'Server configuration error: BACKEND_URL not set',
+        details: 'Please contact support'
+      });
+    }
+    
+    const backendUrl = BACKEND_URL || `http://localhost:${process.env.PORT || 5000}`;
+    const callbackSuccessUrl = process.env.PAYU_CALLBACK_SUCCESS_URL || `${backendUrl}/api/payment/payu/callback?status=success`;
+    const callbackFailUrl = process.env.PAYU_CALLBACK_FAIL_URL || `${backendUrl}/api/payment/payu/callback?status=fail`;
 
     // Frontend redirect URLs (where user is redirected after backend processes POST)
-    // For production, FRONTEND_URL should be set to your live frontend URL (e.g., https://your-frontend.vercel.app)
-    const FRONTEND_URL = process.env.FRONTEND_URL || (process.env.NODE_ENV === 'production'
-      ? 'https://your-frontend-domain.com'
-      : 'http://localhost:5174');
+    // For production, FRONTEND_URL MUST be set to your live frontend URL
+    const FRONTEND_URL = process.env.FRONTEND_URL;
     
-    const frontendSuccessUrl = process.env.PAYU_SUCCESS_URL || `${FRONTEND_URL}/payment-success`;
-    const frontendFailUrl = process.env.PAYU_FAIL_URL || `${FRONTEND_URL}/payment-fail`;
+    if (!FRONTEND_URL && process.env.NODE_ENV === 'production') {
+      console.error('❌ CRITICAL: FRONTEND_URL environment variable is not set in production!');
+      console.error('Payment redirects will fail. Please set FRONTEND_URL in your AWS environment variables.');
+      return res.status(500).json({ 
+        error: 'Server configuration error: FRONTEND_URL not set',
+        details: 'Please contact support'
+      });
+    }
+    
+    const frontendUrl = FRONTEND_URL || 'http://localhost:5174';
+    const frontendSuccessUrl = process.env.PAYU_SUCCESS_URL || `${frontendUrl}/payment-success`;
+    const frontendFailUrl = process.env.PAYU_FAIL_URL || `${frontendUrl}/payment-fail`;
+    
+    // Log URLs for debugging (remove sensitive data in production)
+    console.log('PayU URLs configured:', {
+      backendUrl: backendUrl.replace(/\/\/.*@/, '//***@'), // Hide credentials if any
+      frontendUrl,
+      callbackSuccessUrl: callbackSuccessUrl.replace(/\/\/.*@/, '//***@'),
+      callbackFailUrl: callbackFailUrl.replace(/\/\/.*@/, '//***@'),
+    });
 
     // Store txnid -> userId mapping if userId is available (from optional auth)
     // This helps us find the user during callback when PayU sends POST
@@ -159,13 +183,18 @@ export const verifyPayUPayment = async (req, res) => {
     } = dataSource;
 
     // Frontend redirect URLs
-    // For production, FRONTEND_URL should be set to your live frontend URL
-    const FRONTEND_URL = process.env.FRONTEND_URL || (process.env.NODE_ENV === 'production'
-      ? 'https://your-frontend-domain.com'
-      : 'http://localhost:5174');
+    // For production, FRONTEND_URL MUST be set to your live frontend URL
+    const FRONTEND_URL = process.env.FRONTEND_URL;
     
-    const frontendSuccessUrl = process.env.PAYU_SUCCESS_URL || `${FRONTEND_URL}/payment-success`;
-    const frontendFailUrl = process.env.PAYU_FAIL_URL || `${FRONTEND_URL}/payment-fail`;
+    if (!FRONTEND_URL && process.env.NODE_ENV === 'production') {
+      console.error('❌ CRITICAL: FRONTEND_URL environment variable is not set in production!');
+      const frontendFailUrl = 'http://localhost:5174/payment-fail'; // Fallback
+      return res.redirect(`${frontendFailUrl}?error=Server configuration error`);
+    }
+    
+    const frontendUrl = FRONTEND_URL || 'http://localhost:5174';
+    const frontendSuccessUrl = process.env.PAYU_SUCCESS_URL || `${frontendUrl}/payment-success`;
+    const frontendFailUrl = process.env.PAYU_FAIL_URL || `${frontendUrl}/payment-fail`;
 
     // If GET request without required data, redirect to fail page
     if (!isPost && (!txnid || !status)) {
@@ -283,9 +312,7 @@ export const verifyPayUPayment = async (req, res) => {
     return res.redirect(redirectUrl);
   } catch (err) {
     console.error('PayU verifyPayment error:', err?.message || err);
-    const FRONTEND_URL = process.env.FRONTEND_URL || (process.env.NODE_ENV === 'production'
-      ? 'https://your-frontend-domain.com'
-      : 'http://localhost:5174');
+    const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5174';
     const frontendFailUrl = process.env.PAYU_FAIL_URL || `${FRONTEND_URL}/payment-fail`;
     return res.redirect(`${frontendFailUrl}?error=Verification failed`);
   }

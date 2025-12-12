@@ -136,10 +136,21 @@ export default function AddressForm() {
       const form = document.createElement('form');
       form.method = 'POST';
       // Use live PayU URL for production, test URL for development
-      const isProduction = import.meta.env.PROD || import.meta.env.VITE_PAYU_MODE === 'live';
-      form.action = isProduction 
+      // Check explicit VITE_PAYU_MODE first, then fallback to PROD mode
+      const payuMode = import.meta.env.VITE_PAYU_MODE;
+      const isProduction = payuMode === 'live' || (payuMode !== 'test' && import.meta.env.PROD);
+      const payuUrl = isProduction 
         ? 'https://secure.payu.in/_payment' // PayU live URL
         : 'https://test.payu.in/_payment';  // PayU test URL
+      
+      console.log('PayU Configuration:', {
+        payuMode,
+        isProduction,
+        payuUrl,
+        envProd: import.meta.env.PROD
+      });
+      
+      form.action = payuUrl;
       form.id = 'payuForm';
 
       // Add ALL required PayU fields in EXACT order and naming

@@ -24,6 +24,30 @@ console.log(
   Boolean(process.env.PAYU_SALT)
 );
 
+// Validate critical environment variables in production
+if (process.env.NODE_ENV === 'production') {
+  const requiredVars = {
+    'PAYU_KEY': process.env.PAYU_KEY,
+    'PAYU_SALT': process.env.PAYU_SALT,
+    'BACKEND_URL': process.env.BACKEND_URL,
+    'FRONTEND_URL': process.env.FRONTEND_URL,
+  };
+  
+  const missing = Object.entries(requiredVars)
+    .filter(([key, value]) => !value)
+    .map(([key]) => key);
+  
+  if (missing.length > 0) {
+    console.error('❌ CRITICAL: Missing required environment variables in production:');
+    missing.forEach(key => console.error(`   - ${key}`));
+    console.error('PayU payments will NOT work without these variables!');
+  } else {
+    console.log('✅ All PayU environment variables are configured');
+    console.log('Backend URL:', process.env.BACKEND_URL);
+    console.log('Frontend URL:', process.env.FRONTEND_URL);
+  }
+}
+
 const server = express();
 
 // When behind proxy (Render)
