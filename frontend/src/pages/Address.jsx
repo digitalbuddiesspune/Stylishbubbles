@@ -1,7 +1,7 @@
 import React, { useState, useContext, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
-import { getMyAddress, saveMyAddress, deleteAddressById, createPayUTxn, verifyPayment } from '../services/api';
+import { getMyAddress, saveMyAddress, deleteAddressById, createPayUTxn, verifyPayment, createCODOrder } from '../services/api';
 import { api } from '../utils/api';
 
 const indianStates = [
@@ -54,11 +54,11 @@ export default function AddressForm() {
   const [formData, setFormData] = useState({
     name: '',
     mobile: '',
-    pincode: '',
-    locality: '',
-    address: '',
-    city: '',
-    state: '',
+    pincode: '110034',
+    locality: 'Netaji Subhash Place',
+    address: '365, 3rd Floor, H9, Vardhman Corporate Plaza',
+    city: 'Pitampura',
+    state: 'Delhi',
     landmark: '',
     alternatePhone: '',
     addressType: 'home'
@@ -67,8 +67,8 @@ export default function AddressForm() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [showForm, setShowForm] = useState(true);
   const [userEmail, setUserEmail] = useState('');
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-  const [formSubmitted, setFormSubmitted] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState('payu'); // 'payu' or 'cod'
+  const [processingOrder, setProcessingOrder] = useState(false);
   const { cart, cartTotal: total, loadCart } = useCart();
 
   // Calculate price details
@@ -95,23 +95,6 @@ export default function AddressForm() {
   const priceDetails = calculatePriceDetails();
 
   const handlePayment = async () => {
-    // Check sessionStorage for recent payment attempt (prevents duplicate even after page reload)
-    const lastPaymentAttempt = sessionStorage.getItem('lastPaymentAttempt');
-    const lastPaymentTime = lastPaymentAttempt ? parseInt(lastPaymentAttempt, 10) : 0;
-    const timeSinceLastPayment = Date.now() - lastPaymentTime;
-    
-    if (timeSinceLastPayment < 5000) { // 5 seconds cooldown
-      console.warn('Payment attempt too soon after last attempt, please wait');
-      alert('Please wait a few seconds before trying again.');
-      return;
-    }
-
-    // Prevent multiple simultaneous payment requests
-    if (isProcessingPayment || formSubmitted) {
-      console.warn('Payment already in progress or form already submitted, ignoring duplicate request');
-      return;
-    }
-
     if (!hasSavedAddress) {
       alert('Please save your delivery address first.');
       return;
@@ -123,175 +106,101 @@ export default function AddressForm() {
       return;
     }
     
-    if (!userEmail) {
+    if (paymentMethod === 'payu' && !userEmail) {
       alert('Unable to fetch your email. Please refresh the page and try again.');
       return;
     }
     
-    // Check if form already exists (prevent duplicate submissions)
-    const existingForm = document.getElementById('payuForm');
-    if (existingForm) {
-      console.warn('PayU form already exists, removing old form');
-      existingForm.remove();
-    }
-    
-    // Store payment attempt timestamp
-    sessionStorage.setItem('lastPaymentAttempt', Date.now().toString());
-    
-    setIsProcessingPayment(true);
-    
     try {
-      const amount = priceDetails.total;
-      if (!amount || amount <= 0) {
-        alert('Invalid order amount. Please check your cart.');
-        setIsProcessingPayment(false);
-        return;
-      }
-      
-      console.log('Creating PayU transaction with:', {
-        amount,
-        name: formData.name.trim(),
-        email: userEmail.trim(),
-        phone: formData.mobile.trim()
-      });
-      
-      const payuData = await createPayUTxn(
-        amount,
-        formData.name.trim(),
-        userEmail.trim(),
-        formData.mobile.trim()
-      );
+      setProcessingOrder(true);
 
-      console.log('PayU transaction created:', payuData);
-
-      // Create a form and auto-submit to PayU
-      const form = document.createElement('form');
-      form.method = 'POST';
-      // Use live PayU URL for production, test URL for development
-      // Check explicit VITE_PAYU_MODE first, then fallback to PROD mode
-      const payuMode = import.meta.env.VITE_PAYU_MODE;
-      const isProduction = payuMode === 'live' || (payuMode !== 'test' && import.meta.env.PROD);
-      const payuUrl = isProduction 
-        ? 'https://secure.payu.in/_payment' // PayU live URL
-        : 'https://test.payu.in/_payment';  // PayU test URL
-      
-      console.log('PayU Configuration:', {
-        payuMode,
-        isProduction,
-        payuUrl,
-        envProd: import.meta.env.PROD
-      });
-      
-      form.action = payuUrl;
-      form.id = 'payuForm';
-
-      // Add ALL required PayU fields in EXACT order and naming
-      const addField = (name, value) => {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = name;
-        input.value = value || '';
-        form.appendChild(input);
-      };
-
-      // Required fields (must match backend hash calculation order)
-      addField('key', payuData.key);
-      addField('txnid', payuData.txnid);
-      addField('amount', payuData.amount);
-      addField('productinfo', payuData.productinfo);
-      addField('firstname', payuData.firstname);
-      addField('email', payuData.email);
-      
-      // UDF fields (required even if empty - must be present for hash to match)
-      addField('udf1', '');
-      addField('udf2', '');
-      addField('udf3', '');
-      addField('udf4', '');
-      addField('udf5', '');
-      
-      // Additional required fields
-      addField('phone', payuData.phone);
-      addField('surl', payuData.surl);
-      addField('furl', payuData.furl);
-      addField('hash', payuData.hash);
-
-      // Prevent multiple form submissions
-      if (formSubmitted) {
-        console.warn('Form already submitted, preventing duplicate submission');
-        setIsProcessingPayment(false);
-        return;
-      }
-
-      // Store transaction ID in sessionStorage to prevent reuse
-      const existingTxnId = sessionStorage.getItem('payuTxnId');
-      if (existingTxnId === payuData.txnid) {
-        console.warn('Transaction ID already used, preventing duplicate submission');
-        setIsProcessingPayment(false);
-        alert('This payment is already being processed. Please wait...');
-        return;
-      }
-
-      // Mark form as submitted BEFORE appending to DOM
-      setFormSubmitted(true);
-      
-      // Store transaction ID to prevent reuse
-      sessionStorage.setItem('payuTxnId', payuData.txnid);
-      sessionStorage.setItem('payuFormSubmitted', 'true');
-      
-      // Add submit event listener to prevent double submission
-      let submitCount = 0;
-      const submitHandler = (e) => {
-        submitCount++;
-        console.log('Form submit event triggered, count:', submitCount);
-        if (submitCount > 1) {
-          console.warn('Preventing duplicate form submission');
-          e.preventDefault();
-          e.stopPropagation();
-          e.stopImmediatePropagation();
-          return false;
+      if (paymentMethod === 'cod') {
+        // Handle COD order
+        try {
+          const result = await createCODOrder();
+          console.log('COD Order successful:', result);
+          // Reload cart to reflect empty cart
+          if (loadCart) {
+            await loadCart();
+          }
+          // Navigate to success page
+          navigate('/payment-success?type=cod');
+          return; // Exit early to prevent further execution
+        } catch (codError) {
+          console.error('COD Order error:', codError);
+          throw codError; // Re-throw to be caught by outer catch
         }
-        // Remove listener after first submit
-        form.removeEventListener('submit', submitHandler);
-      };
-      
-      form.addEventListener('submit', submitHandler, { capture: true, once: false });
-
-      // Disable form submission via other means
-      form.setAttribute('data-submitted', 'true');
-      
-      document.body.appendChild(form);
-      
-      // Auto-submit the form (don't reset isProcessingPayment as we're navigating away)
-      // Use setTimeout to ensure form is fully in DOM before submission
-      setTimeout(() => {
-        // Double check form hasn't been removed or already submitted
-        const formElement = document.getElementById('payuForm');
-        if (!formElement || formElement.getAttribute('data-submitted') !== 'true') {
-          console.warn('Form was removed or modified, aborting submission');
-          setIsProcessingPayment(false);
-          setFormSubmitted(false);
-          sessionStorage.removeItem('payuTxnId');
-          sessionStorage.removeItem('payuFormSubmitted');
+      } else {
+        // Handle PayU payment
+        const amount = priceDetails.total;
+        if (!amount || amount <= 0) {
+          alert('Invalid order amount. Please check your cart.');
           return;
         }
         
-        console.log('Submitting PayU form with txnid:', payuData.txnid);
-        // Use requestSubmit instead of submit for better control
-        try {
-          formElement.requestSubmit();
-        } catch (err) {
-          // Fallback to submit if requestSubmit not supported
-          console.log('requestSubmit not supported, using submit');
-          formElement.submit();
-        }
-      }, 100);
+        console.log('Creating PayU transaction with:', {
+          amount,
+          name: formData.name.trim(),
+          email: userEmail.trim(),
+          phone: formData.mobile.trim()
+        });
+        
+        const payuData = await createPayUTxn(
+          amount,
+          formData.name.trim(),
+          userEmail.trim(),
+          formData.mobile.trim()
+        );
+
+        console.log('PayU transaction created:', payuData);
+
+        // Create a form and auto-submit to PayU
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = 'https://test.payu.in/_payment'; // PayU test URL
+        form.id = 'payuForm';
+
+        // Add ALL required PayU fields in EXACT order and naming
+        const addField = (name, value) => {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = name;
+          input.value = value || '';
+          form.appendChild(input);
+        };
+
+        // Required fields (must match backend hash calculation order)
+        addField('key', payuData.key);
+        addField('txnid', payuData.txnid);
+        addField('amount', payuData.amount);
+        addField('productinfo', payuData.productinfo);
+        addField('firstname', payuData.firstname);
+        addField('email', payuData.email);
+        
+        // UDF fields (required even if empty - must be present for hash to match)
+        addField('udf1', '');
+        addField('udf2', '');
+        addField('udf3', '');
+        addField('udf4', '');
+        addField('udf5', '');
+        
+        // Additional required fields
+        addField('phone', payuData.phone);
+        addField('surl', payuData.surl);
+        addField('furl', payuData.furl);
+        addField('hash', payuData.hash);
+
+        document.body.appendChild(form);
+        
+        // Auto-submit the form
+        form.submit();
+      }
     } catch (e) {
       console.error('Payment error:', e);
-      const errorMessage = e.message || 'Unable to start payment. Please try again.';
+      const errorMessage = e.message || 'Unable to process order. Please try again.';
       alert(errorMessage);
-      setIsProcessingPayment(false);
-      setFormSubmitted(false); // Reset on error so user can retry
-      // Don't clear sessionStorage on error - keep cooldown active
+    } finally {
+      setProcessingOrder(false);
     }
   };
 
@@ -488,11 +397,11 @@ export default function AddressForm() {
       setFormData({
         name: '',
         mobile: '',
-        pincode: '',
-        locality: '',
-        address: '',
-        city: '',
-        state: '',
+        pincode: '110034',
+        locality: 'Netaji Subhash Place',
+        address: '365, 3rd Floor, H9, Vardhman Corporate Plaza',
+        city: 'Pitampura',
+        state: 'Delhi',
         landmark: '',
         alternatePhone: '',
         addressType: 'home'
@@ -546,11 +455,11 @@ export default function AddressForm() {
                             setFormData({
                               name: '',
                               mobile: '',
-                              pincode: '',
-                              locality: '',
-                              address: '',
-                              city: '',
-                              state: '',
+                              pincode: '110034',
+                              locality: 'Netaji Subhash Place',
+                              address: '365, 3rd Floor, H9, Vardhman Corporate Plaza',
+                              city: 'Pitampura',
+                              state: 'Delhi',
                               landmark: '',
                               alternatePhone: '',
                               addressType: 'home'
@@ -863,16 +772,47 @@ export default function AddressForm() {
               <span>₹{priceDetails.total.toLocaleString()}</span>
             </div>
 
+            {/* Payment Method Selection */}
+            <div className="mb-4 pb-4 border-b">
+              <h4 className="text-sm font-medium text-gray-700 mb-3">Select Payment Method</h4>
+              <div className="space-y-2">
+                <label className="flex items-center gap-3 p-3 border rounded cursor-pointer hover:bg-gray-50">
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="payu"
+                    checked={paymentMethod === 'payu'}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    className="w-4 h-4 text-black focus:ring-black"
+                  />
+                  <div className="flex-1">
+                    <div className="font-medium text-sm">Online Payment (PayU)</div>
+                    <div className="text-xs text-gray-500">Pay securely with debit/credit card, UPI, netbanking</div>
+                  </div>
+                </label>
+                <label className="flex items-center gap-3 p-3 border rounded cursor-pointer hover:bg-gray-50">
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="cod"
+                    checked={paymentMethod === 'cod'}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    className="w-4 h-4 text-black focus:ring-black"
+                  />
+                  <div className="flex-1">
+                    <div className="font-medium text-sm">Cash on Delivery (COD)</div>
+                    <div className="text-xs text-gray-500">Pay cash when your order is delivered</div>
+                  </div>
+                </label>
+              </div>
+            </div>
+
             <button 
               onClick={handlePayment}
-              disabled={!hasSavedAddress || isProcessingPayment || formSubmitted}
-              className={`w-full mt-4 py-3 px-4 rounded-md transition-colors font-medium ${
-                !hasSavedAddress || isProcessingPayment || formSubmitted
-                  ? 'bg-gray-300 text-gray-600 cursor-not-allowed' 
-                  : 'bg-black text-white hover:bg-gray-800 cursor-pointer'
-              }`}
+              disabled={!hasSavedAddress || processingOrder}
+              className={`w-full mt-4 py-3 px-4 rounded-md transition-colors font-medium cursor-pointer ${hasSavedAddress && !processingOrder ? 'bg-black text-white hover:bg-gray-800' : 'bg-gray-300 text-gray-600 cursor-not-allowed'}`}
             >
-              {formSubmitted ? 'REDIRECTING TO PAYU...' : isProcessingPayment ? 'PROCESSING...' : 'PROCEED TO PAYMENT'}
+              {processingOrder ? 'Processing...' : paymentMethod === 'cod' ? 'PLACE ORDER (COD)' : 'PROCEED TO PAYMENT'}
             </button>
           </div>
         </div>

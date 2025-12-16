@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createPayUTxn, verifyPayUPayment, verifyPayment } from '../controllers/payment.controller.js';
+import { createPayUTxn, verifyPayUPayment, verifyPayment, createCODOrder } from '../controllers/payment.controller.js';
 import auth from '../middleware/auth.js';
 
 const router = Router();
@@ -13,5 +13,8 @@ router.get('/payu/callback', verifyPayUPayment);
 
 // Legacy verify endpoint (for frontend to check after redirect)
 router.post('/verify', auth, verifyPayment);
+
+// COD (Cash on Delivery) order creation
+router.post('/cod/create', auth, createCODOrder);
 
 export default router;

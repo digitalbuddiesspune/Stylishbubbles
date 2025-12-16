@@ -392,6 +392,7 @@ export const verifyPayUPayment = async (req, res) => {
                   items,
                   amount: orderAmount,
                   currency: 'INR',
+                  paymentMethod: 'payu',
                   status: 'paid',
                   payuTxnId: txnid,
                   payuPaymentId: mihpayid || bank_ref_num,
@@ -515,6 +516,7 @@ export const verifyPayment = async (req, res) => {
       items,
       amount,
       currency: 'INR',
+      paymentMethod: 'payu',
       status: 'paid',
       payuTxnId: txnid,
       shippingAddress,
@@ -527,5 +529,95 @@ export const verifyPayment = async (req, res) => {
   } catch (err) {
     console.error('verifyPayment error:', err?.message || err);
     return res.status(500).json({ error: 'Verification failed' });
+  }
+};
+
+// Create COD (Cash on Delivery) order
+export const createCODOrder = async (req, res) => {
+  try {
+    const userId = req.userId;
+    console.log('COD Order request - userId:', userId);
+    
+    if (!userId) {
+      console.error('COD Order: No userId found in request');
+      return res.status(401).json({ error: 'Unauthorized. Please sign in to place an order.' });
+    }
+
+    // Get user's cart
+    const cart = await Cart.findOne({ user: userId }).populate('items.product');
+    console.log('COD Order - Cart found:', cart ? `Yes, ${cart.items?.length || 0} items` : 'No');
+    
+    if (!cart || !Array.isArray(cart.items) || cart.items.length === 0) {
+      return res.status(400).json({ error: 'Cart is empty. Please add items to your cart before placing an order.' });
+    }
+
+    // Calculate order items with prices
+    const items = cart.items.map(i => {
+      const p = i.product;
+      let base = 0;
+      if (p && typeof p.price === 'number') {
+        base = Number(p.price) || 0;
+      } else {
+        const mrp = Number(p?.mrp) || 0;
+        const discountPercent = Number(p?.discountPercent) || 0;
+        base = Math.round(mrp - (mrp * discountPercent) / 100) || 0;
+      }
+      return { product: p._id, quantity: i.quantity, price: base };
+    });
+
+    const orderAmount = items.reduce((sum, it) => sum + (it.price * it.quantity), 0);
+
+    if (!orderAmount || orderAmount <= 0) {
+      return res.status(400).json({ error: 'Invalid order amount' });
+    }
+
+    // Get shipping address
+    let shippingAddress = null;
+    try {
+      const addr = await Address.findOne({ userId });
+      if (addr) {
+        const { fullName, mobileNumber, pincode, locality, address, city, state, landmark, alternatePhone, addressType } = addr;
+        shippingAddress = { fullName, mobileNumber, pincode, locality, address, city, state, landmark, alternatePhone, addressType };
+      } else {
+        return res.status(400).json({ error: 'Shipping address not found. Please save your address first.' });
+      }
+    } catch (addrErr) {
+      return res.status(400).json({ error: 'Shipping address not found. Please save your address first.' });
+    }
+
+    // Create COD order with status 'pending'
+    const order = await Order.create({
+      user: userId,
+      items,
+      amount: orderAmount,
+      currency: 'INR',
+      paymentMethod: 'cod',
+      status: 'pending',
+      shippingAddress,
+    });
+
+    // Clear cart after successful order creation
+    cart.items = [];
+    await cart.save();
+
+    console.log('COD Order created successfully:', order._id);
+
+    return res.json({
+      success: true,
+      message: 'Order placed successfully. You will pay when the order is delivered.',
+      order,
+    });
+  } catch (err) {
+    console.error('createCODOrder error:', err);
+    console.error('Error details:', {
+      message: err.message,
+      stack: err.stack,
+      name: err.name
+    });
+    return res.status(500).json({ 
+      error: 'Failed to create COD order', 
+      message: err.message || 'An unexpected error occurred. Please try again.',
+      details: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
   }
 };

@@ -26,7 +26,7 @@ const Contact = () => {
               <div className="text-3xl text-amber-600">📍</div>
               <div>
                 <p className="text-lg text-gray-700 leading-relaxed">
-                  365, 3RD FLOOR, H9, NETAJI SUBHASH PLACE, PITAMPURA DELHI 110034
+                  365, 3rd Floor, H9, Vardhman Corporate Plaza, Netaji Subhash Place, Pitampura, Delhi, 110034
                 </p>
               </div>
             </div>

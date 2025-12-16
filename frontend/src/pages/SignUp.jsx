@@ -131,7 +131,7 @@ const SignUp = () => {
         }
         navigate('/', { replace: true });
       } else {
-        navigate('/signin', { replace: true });
+      navigate('/signin', { replace: true });
       }
     } catch (err) {
       setError(err.message || 'Failed to create account');
@@ -344,11 +344,11 @@ const SignUp = () => {
                   </button>
                 ) : (
                   <>
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="w-full bg-gradient-to-r from-rose-500 to-rose-600 text-white py-2.5 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 text-sm disabled:opacity-60"
-                    >
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-gradient-to-r from-rose-500 to-rose-600 text-white py-2.5 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 text-sm disabled:opacity-60"
+                >
                       {loading ? 'Creating Account...' : 'Create Account'}
                     </button>
                     {otpTimer === 0 && (
@@ -359,7 +359,7 @@ const SignUp = () => {
                         className="w-full mt-2 border border-rose-500 text-rose-600 py-2 rounded-lg font-semibold hover:bg-rose-50 transition-all duration-300 text-sm"
                       >
                         Resend OTP
-                      </button>
+                </button>
                     )}
                   </>
                 )}
