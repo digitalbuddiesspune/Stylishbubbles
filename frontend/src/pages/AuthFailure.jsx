@@ -10,7 +10,7 @@ export default function AuthFailure() {
   return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="text-center">
-        <div className="text-rose-600 font-semibold mb-2">Google sign-in failed</div>
+        <div className="text-rose-600 font-semibold mb-2">Authentication failed</div>
         <div className="text-gray-600">Redirecting to Sign In…</div>
       </div>
     </div>

@@ -12,7 +12,7 @@ const userSchema = new mongoose.Schema(
     // OAuth fields
     googleId: { type: String, unique: true, sparse: true, index: true },
     avatar: { type: String },
-    provider: { type: String, enum: ['local', 'google'], default: 'google' },
+    provider: { type: String, enum: ['local', 'google'], default: 'local' },
     resetPasswordToken: { type: String },
     resetPasswordExpiresAt: { type: Date },
     isAdmin: { type: Boolean, default: false },

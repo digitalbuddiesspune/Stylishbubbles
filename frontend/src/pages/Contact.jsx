@@ -26,7 +26,11 @@ const Contact = () => {
               <div className="text-3xl text-amber-600">📍</div>
               <div>
                 <p className="text-lg text-gray-700 leading-relaxed">
-                  365, 3rd Floor, H9, Vardhman Corporate Plaza, Netaji Subhash Place, Pitampura, Delhi, 110034
+                  365, 3rd Floor, H9, Vardhman Corporate Plaza, Netaji Subhash Place, Pitampura, Delhi, 110034  <p className="text-gray-700">and also at</p>
+
+                  <p className="text-gray-700">WOKIFY VENTURES (OPC) PRIVATE LIMITED
+SHOP AT WZ-68/1, TITARPUR, CHAUKHANDI NEWDELHI, Tagore Garden, New Delhi, West Delhi- 110027, Delhi
+*as issued by Income tax Department</p>
                 </p>
               </div>
             </div>
@@ -42,8 +46,8 @@ const Contact = () => {
               <div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">Email</h3>
                 <p className="text-gray-700">
-                  <a href="mailto:wokifyventures987@outlook.com" className="hover:text-amber-600 transition-colors">
-                    wokifyventures987@outlook.com
+                  <a href="mailto:support@stylishbubbles.in." className="hover:text-amber-600 transition-colors">
+                  support@stylishbubbles.in.
                   </a>
                 </p>
               </div>

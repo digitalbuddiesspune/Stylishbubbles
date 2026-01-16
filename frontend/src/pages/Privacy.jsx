@@ -74,10 +74,28 @@ const Privacy = () => {
             </p>
           </div>
 
-          {/* Section 6: Your Rights */}
+          {/* Section 6: Data Retention Policy */}
           <div className="mb-12 p-8 bg-gradient-to-br from-amber-50 to-white border-2 border-amber-100 rounded-lg shadow-md">
             <h2 className="text-2xl font-semibold text-gray-900 mb-4 flex items-center">
               <span className="text-amber-600 mr-3">6.</span>
+              Data Retention Policy
+            </h2>
+            <p className="text-lg text-gray-700 leading-relaxed mb-4">
+              We retain your data according to the following retention periods:
+            </p>
+            <ul className="text-lg text-gray-700 leading-relaxed space-y-2 list-disc list-inside">
+              <li>Customer account information is retained while the account is active and up to 3 years after closure.</li>
+              <li>Order, invoice, payment, and GST-related records are retained for a minimum of 8 years as required by law.</li>
+              <li>KYC documents, where applicable, are retained during the business relationship and for 5 years thereafter.</li>
+              <li>Marketing and analytics data is retained until consent is withdrawn or for a maximum of 24 months.</li>
+              <li>Data is securely deleted or anonymized once the retention period expires, unless legally required otherwise.</li>
+            </ul>
+          </div>
+
+          {/* Section 7: Your Rights */}
+          <div className="mb-12 p-8 bg-gradient-to-br from-amber-50 to-white border-2 border-amber-100 rounded-lg shadow-md">
+            <h2 className="text-2xl font-semibold text-gray-900 mb-4 flex items-center">
+              <span className="text-amber-600 mr-3">7.</span>
               Your Rights
             </h2>
             <p className="text-lg text-gray-700 leading-relaxed">
@@ -85,10 +103,10 @@ const Privacy = () => {
             </p>
           </div>
 
-          {/* Section 7: Contact Us */}
+          {/* Section 8: Contact Us */}
           <div className="mb-12 p-8 bg-gradient-to-br from-amber-50 to-white border-2 border-amber-100 rounded-lg shadow-md">
             <h2 className="text-2xl font-semibold text-gray-900 mb-4 flex items-center">
-              <span className="text-amber-600 mr-3">7.</span>
+              <span className="text-amber-600 mr-3">8.</span>
               Contact Us
             </h2>
             <p className="text-lg text-gray-700 leading-relaxed">
