@@ -25,12 +25,12 @@ const Contact = () => {
             <div className="flex items-start space-x-4 p-6 bg-white border-2 border-gray-200 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300">
               <div className="text-3xl text-amber-600">📍</div>
               <div>
+                <p className="text-lg text-gray-700 leading-relaxed mb-4">
+                  365, 3rd Floor, H9, Vardhman Corporate Plaza, Netaji Subhash Place, Pitampura, Delhi, 110034
+                </p>
+                <hr className="my-4 border-gray-300" />
                 <p className="text-lg text-gray-700 leading-relaxed">
-                  365, 3rd Floor, H9, Vardhman Corporate Plaza, Netaji Subhash Place, Pitampura, Delhi, 110034  <p className="text-gray-700">and also at</p>
-
-                  <p className="text-gray-700">WOKIFY VENTURES (OPC) PRIVATE LIMITED
-SHOP AT WZ-68/1, TITARPUR, CHAUKHANDI NEWDELHI, Tagore Garden, New Delhi, West Delhi- 110027, Delhi
-*as issued by Income tax Department</p>
+                  WOKIFY VENTURES (OPC) PRIVATE LIMITED SHOP AT WZ-68/1, TITARPUR, CHAUKHANDI NEWDELHI, Tagore Garden, New Delhi, West Delhi- 110027, Delhi *as issued by Income tax Department
                 </p>
               </div>
             </div>
